@@ -13,7 +13,7 @@ git clone https://github.com/tuannt591/fpl-vntrip.git
 2. Go into project
 
 ```bash
-cd uhm-landing-page
+cd fpl-vntrip
 ```
 
 3. Install dependencies
