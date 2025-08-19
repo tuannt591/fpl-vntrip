@@ -3,8 +3,8 @@ import "./globals.css";
 import { ThemeProvider } from "@/context/theme-context";
 
 export const metadata: Metadata = {
-  title: "Uhm Landing Page",
-  description: "Uhmm...! - A modern, secure chat app that connects people quickly and easily",
+  title: "FPL VNTrip",
+  description: "FPL VNTrip - A modern, secure chat app that connects people quickly and easily",
 };
 
 export default function RootLayout({
@@ -14,12 +14,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      {/* <head>
-        <Script
-          src="https://www.googletagmanager.com/gtm.js?id=GTM-W8KL5Q5"
-          strategy="afterInteractive"
-        />
-      </head> */}
       <body className="full-screen-preview" suppressHydrationWarning={true}>
         <ThemeProvider>
           {children}
