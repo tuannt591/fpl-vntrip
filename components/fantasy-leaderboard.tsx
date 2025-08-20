@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from 'react';
+import Image from 'next/image';
 import {
   Table,
   TableBody,
@@ -292,12 +293,196 @@ const fetchPicksData = async (teamId: number, eventId: number): Promise<PicksDat
   }
 };
 
-// Hàm để fetch dữ liệu từ API route (giải quyết vấn đề CORS)
+// Hàm để search thông minh - SMART SEARCH với early termination
+const smartSearchLeaderboard = async (
+  leagueId: string,
+  searchTerm: string,
+  maxEntriesHint?: number | null,
+  onProgress?: (loaded: number, total: number, found: number) => void
+): Promise<{ entries: LeaderboardEntry[], hasMore: boolean, totalLoaded: number, foundExactMatch: boolean }> => {
+  const foundEntries: LeaderboardEntry[] = [];
+  const searchLower = searchTerm.toLowerCase().trim();
+  let currentPage = 1;
+  let hasNext = true;
+  let totalLoaded = 0;
+  let foundExactMatch = false;
+
+  // Dynamic max pages based on league size
+  const baseMaxPages = 300; // Default maximum (15,000 managers)
+  const maxPages = maxEntriesHint ? Math.min(Math.ceil(maxEntriesHint / 50), baseMaxPages) : baseMaxPages;
+
+  try {
+    while (hasNext && currentPage <= maxPages && !foundExactMatch) {
+      const batchPromises: Promise<any>[] = [];
+      const batchSize = 5; // Load 5 pages at once for better performance
+
+      // Create batch of requests
+      for (let i = 0; i < batchSize && hasNext && currentPage <= maxPages; i++) {
+        batchPromises.push(fetchLeaderboardData(leagueId, currentPage + i, 1));
+      }
+
+      // Execute batch
+      const batchResults = await Promise.all(batchPromises);
+
+      for (const result of batchResults) {
+        totalLoaded += result.entries.length;
+
+        // Check each entry for matches
+        for (const entry of result.entries) {
+          const managerMatch = entry.manager.toLowerCase().includes(searchLower);
+          const teamMatch = entry.teamName.toLowerCase().includes(searchLower);
+
+          if (managerMatch || teamMatch) {
+            foundEntries.push(entry);
+
+            // Check for exact match để có thể dừng sớm
+            const isExactManagerMatch = entry.manager.toLowerCase() === searchLower;
+            const isExactTeamMatch = entry.teamName.toLowerCase() === searchLower;
+
+            if (isExactManagerMatch || isExactTeamMatch) {
+              foundExactMatch = true;
+              console.log(`🎯 Found exact match: ${entry.manager} - ${entry.teamName}`);
+            }
+          }
+        }
+
+        hasNext = result.hasNext;
+        onProgress?.(currentPage, Math.min(Math.ceil(totalLoaded / 50 * 2), maxPages), foundEntries.length);
+
+        // Early termination conditions
+        if (foundExactMatch) {
+          console.log(`✅ Stopping search - found exact match after ${currentPage} pages`);
+          break;
+        }
+
+        // If we found some matches and loaded a reasonable amount, consider stopping
+        if (foundEntries.length >= 10 && currentPage >= 20) {
+          console.log(`✅ Stopping search - found ${foundEntries.length} matches after ${currentPage} pages`);
+          break;
+        }
+
+        if (!hasNext) break;
+      }
+
+      currentPage += batchSize;
+
+      // Small delay to avoid overwhelming server
+      if (hasNext && !foundExactMatch) {
+        await new Promise(resolve => setTimeout(resolve, 30));
+      }
+    }
+
+    // Sort results by relevance (exact matches first, then by rank)
+    foundEntries.sort((a, b) => {
+      const aExactManager = a.manager.toLowerCase() === searchLower;
+      const bExactManager = b.manager.toLowerCase() === searchLower;
+      const aExactTeam = a.teamName.toLowerCase() === searchLower;
+      const bExactTeam = b.teamName.toLowerCase() === searchLower;
+
+      // Exact matches first
+      if ((aExactManager || aExactTeam) && !(bExactManager || bExactTeam)) return -1;
+      if (!(aExactManager || aExactTeam) && (bExactManager || bExactTeam)) return 1;
+
+      // Then by rank
+      return a.rank - b.rank;
+    });
+
+    return {
+      entries: foundEntries,
+      hasMore: hasNext && currentPage <= maxPages,
+      totalLoaded,
+      foundExactMatch
+    };
+  } catch (error) {
+    console.error('Error during smart search:', error);
+    return {
+      entries: foundEntries,
+      hasMore: false,
+      totalLoaded,
+      foundExactMatch
+    };
+  }
+};
+
+// Hàm để fetch toàn bộ dữ liệu league (cho search) - PROGRESSIVE LOADING (fallback)
+const fetchAllLeaderboardData = async (
+  leagueId: string,
+  maxEntriesHint?: number | null,
+  onProgress?: (loaded: number, total: number) => void
+): Promise<{ entries: LeaderboardEntry[], hasMore: boolean, totalLoaded: number }> => {
+  const allEntries: LeaderboardEntry[] = [];
+  let currentPage = 1;
+  let hasNext = true;
+  let totalEstimate = 50; // Start with a basic estimate
+
+  // Dynamic max pages based on league size
+  const baseMaxPages = 300; // Default maximum (15,000 managers)
+  const maxPages = maxEntriesHint ? Math.min(Math.ceil(maxEntriesHint / 50), baseMaxPages) : baseMaxPages;
+
+  try {
+    // Fetch first page to get estimate
+    const firstResult = await fetchLeaderboardData(leagueId, 1, 1);
+    allEntries.push(...firstResult.entries);
+
+    // Better estimate based on first page
+    totalEstimate = Math.min(Math.ceil(allEntries.length * 10), maxPages); // Conservative estimate
+
+    onProgress?.(1, totalEstimate);
+
+    hasNext = firstResult.hasNext;
+    currentPage = 2;
+
+    // Progressive loading với batches
+    while (hasNext && currentPage <= maxPages) { // Increased limit for large leagues (up to 15,000 managers)
+      const batchPromises: Promise<any>[] = [];
+      const batchSize = 3; // Load 3 pages at once for better performance
+
+      // Create batch of requests
+      for (let i = 0; i < batchSize && hasNext && currentPage <= maxPages; i++) {
+        batchPromises.push(fetchLeaderboardData(leagueId, currentPage + i, 1));
+      }
+
+      // Execute batch
+      const batchResults = await Promise.all(batchPromises);
+
+      for (const result of batchResults) {
+        allEntries.push(...result.entries);
+        hasNext = result.hasNext;
+        onProgress?.(currentPage, totalEstimate);
+
+        if (!hasNext) break;
+      }
+
+      currentPage += batchSize;
+
+      // Small delay to avoid overwhelming server
+      if (hasNext) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+    }
+
+    // Check if we hit the limit
+    const hitLimit = hasNext && currentPage > maxPages;
+
+    return {
+      entries: allEntries,
+      hasMore: hitLimit,
+      totalLoaded: allEntries.length
+    };
+  } catch (error) {
+    console.error('Error fetching all leaderboard data:', error);
+    return {
+      entries: allEntries,
+      hasMore: false,
+      totalLoaded: allEntries.length
+    }; // Return what we have
+  }
+};
 const fetchLeaderboardData = async (
   leagueId: string,
   pageId: number = 1,
   phase: number = 1
-): Promise<{ entries: LeaderboardEntry[], leagueName: string, currentGW: number, hasNext: boolean, currentPage: number }> => {
+): Promise<{ entries: LeaderboardEntry[], leagueName: string, currentGW: number, hasNext: boolean, currentPage: number, maxEntries: number | null }> => {
   try {
     const params = new URLSearchParams({
       leagueId: leagueId,
@@ -333,7 +518,8 @@ const fetchLeaderboardData = async (
       leagueName: data.league.name,
       currentGW: data.current_event || Math.max(...entries.map(entry => entry.gw)),
       hasNext: data.standings.has_next,
-      currentPage: data.standings.page
+      currentPage: data.standings.page,
+      maxEntries: data.league.max_entries
     };
   } catch (error) {
     console.error('Error fetching leaderboard data:', error);
@@ -343,7 +529,8 @@ const fetchLeaderboardData = async (
       leagueName: "Không thể tải dữ liệu league",
       currentGW: 0,
       hasNext: false,
-      currentPage: 1
+      currentPage: 1,
+      maxEntries: null
     };
   }
 };
@@ -764,31 +951,33 @@ const PicksDialog = ({
     return (
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogTrigger asChild>
-          <div className={`${isCompact ? 'p-1 sm:p-2' : 'p-2 sm:p-3'} bg-green-600 text-white rounded-lg shadow-lg border-2 border-white relative cursor-pointer hover:bg-green-700 transition-colors`}>
+          <div className={`bg-gradient-to-b from-green-600 to-green-700 text-white rounded-lg shadow-lg border-[1px] border-white relative cursor-pointer hover:from-green-700 hover:to-green-800 transition-all transform hover:scale-105`}>
             {/* Captain/Vice-Captain indicators - only for starting eleven */}
             {pick.position <= 11 && pick.is_captain && (
-              <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 w-4 h-4 sm:w-6 sm:h-6 bg-yellow-500 rounded-full flex items-center justify-center text-xs font-bold border-2 border-white">
+              <div className="absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 w-4 h-4 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center text-[10px] font-medium border-[1px] border-white">
                 C
               </div>
             )}
             {pick.position <= 11 && pick.is_vice_captain && (
-              <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 w-4 h-4 sm:w-6 sm:h-6 bg-blue-500 rounded-full flex items-center justify-center text-xs font-bold border-2 border-white">
+              <div className="absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 w-4 h-4 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full flex items-center justify-center text-[10px] font-medium border-[1px] border-white">
                 V
               </div>
             )}
 
             {/* Player name */}
-            <div className={`font-bold ${isCompact ? 'text-xs' : 'text-xs sm:text-sm'} truncate mb-1`}>
+            <div className={`font-medium w-full p-1 ${isCompact ? 'text-xs leading-tight' : 'text-xs sm:text-sm'} truncate`}>
               {playerInfo.name}
             </div>
 
-            {/* Team */}
-            <div className={`${isCompact ? 'text-xs' : 'text-xs'} opacity-90 mb-1`}>
-              {playerInfo.team}
-            </div>
+            {/* Position & Team - Hide in compact mode */}
+            {!isCompact && (
+              <div className="text-xs opacity-90 mb-1 leading-tight">
+                {playerInfo.position}
+              </div>
+            )}
 
             {/* Points */}
-            <div className={`${isCompact ? 'text-xs sm:text-sm' : 'text-sm sm:text-lg'} font-bold bg-white text-green-600 rounded px-1`}>
+            <div className={`${isCompact ? 'text-xs font-medium' : 'text-sm sm:text-base font-medium'} bg-white text-green-700 text-center rounded-bl-lg rounded-br-lg`}>
               {displayPoints}
             </div>
           </div>
@@ -928,7 +1117,7 @@ const PicksDialog = ({
     const playerPoints = getPlayerPoints(pick.element);
 
     return (
-      <div className={`relative ${isCompact ? 'w-10 sm:w-16' : 'w-12 sm:w-20'} text-center`}>
+      <div className="relative w-full text-center">
         <PlayerDetailDialog
           pick={pick}
           playerInfo={playerInfo}
@@ -997,72 +1186,111 @@ const PicksDialog = ({
               </CardContent>
             </Card>
 
-            {/* Picks List */}
+            {/* Formation Pitch Display */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base sm:text-lg">Đội hình ra sân</CardTitle>
+                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                  ⚽ Đội hình ra sân
+                  {picksData?.active_chip && (
+                    <Badge variant="secondary" className="text-xs">
+                      Chip: {picksData.active_chip}
+                    </Badge>
+                  )}
+                </CardTitle>
               </CardHeader>
-              <CardContent className="pt-0">
-                {picksData.picks.length > 0 ? (
-                  <div className="relative">
-                    {/* Football pitch background */}
-                    <div className="bg-gradient-to-b from-green-400 to-green-500 rounded-lg p-2 sm:p-6 min-h-[300px] sm:min-h-[500px] relative overflow-hidden">
-                      {/* Pitch markings */}
-                      <div className="absolute inset-0 opacity-20">
-                        {/* Center circle */}
-                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-16 h-16 sm:w-32 sm:h-32 border-2 border-white rounded-full"></div>
-                        {/* Center line */}
-                        <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-white"></div>
-                        {/* Goal areas */}
-                        <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-12 h-4 sm:w-24 sm:h-8 border-b-2 border-l-2 border-r-2 border-white"></div>
-                        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-12 h-4 sm:w-24 sm:h-8 border-t-2 border-l-2 border-r-2 border-white"></div>
+              <CardContent className="pt-0 p-2 sm:p-6">
+                {picksData?.picks.length > 0 ? (
+                  <div className="relative w-full max-w-5xl mx-auto">
+                    {/* Pitch Background */}
+                    <div className="relative w-full" style={{ aspectRatio: '1417/788' }}>
+                      <Image
+                        src="/pitch-graphic-t77-OTdp.svg"
+                        alt="Football Pitch"
+                        width={1417}
+                        height={788}
+                        className="w-full h-[400px] object-cover"
+                        priority
+                      />
+
+                      {/* Player positions overlay */}
+                      <div className="absolute inset-0">
+                        {(() => {
+                          const formation = organizeByFormation(picksData.picks);
+
+                          return (
+                            <>
+                              {/* Goalkeeper */}
+                              <div className="absolute" style={{
+                                bottom: '3%',
+                                left: '50%',
+                                transform: 'translateX(-50%)'
+                              }}>
+                                {formation.goalkeeper.map((pick) => (
+                                  <div key={pick.element} className="relative w-[5rem]">
+                                    <PlayerCard pick={pick} isCompact={true} />
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Defenders */}
+                              <div className="absolute flex justify-center items-center gap-2 sm:gap-4" style={{
+                                bottom: '25%',
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                width: '100%'
+                              }}>
+                                {formation.defenders.map((pick, index) => (
+                                  <div key={pick.element} className="flex justify-center relative w-[20%]">
+                                    <PlayerCard pick={pick} isCompact={true} />
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Midfielders */}
+                              <div className="absolute flex justify-center items-center gap-2 sm:gap-4" style={{
+                                bottom: '50%',
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                width: '100%'
+                              }}>
+                                {formation.midfielders.map((pick, index) => (
+                                  <div key={pick.element} className="flex justify-center relative w-[20%]">
+                                    <PlayerCard pick={pick} isCompact={true} />
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Forwards */}
+                              <div className="absolute flex justify-center items-center gap-2 sm:gap-4" style={{
+                                bottom: '73%',
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                width: '100%'
+                              }}>
+                                {formation.forwards.map((pick, index) => (
+                                  <div key={pick.element} className="flex justify-center relative w-[20%]">
+                                    <PlayerCard pick={pick} isCompact={true} />
+                                  </div>
+                                ))}
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
-
-                      {(() => {
-                        const formation = organizeByFormation(picksData.picks);
-                        return (
-                          <div className="relative h-full flex flex-col justify-between py-1 sm:py-4">
-                            {/* Forwards */}
-                            <div className="flex justify-center items-center gap-1 sm:gap-4 mb-2 sm:mb-8">
-                              {formation.forwards.map((pick) => (
-                                <PlayerCard key={pick.position} pick={pick} />
-                              ))}
-                            </div>
-
-                            {/* Midfielders */}
-                            <div className="flex justify-center items-center gap-1 sm:gap-4 mb-2 sm:mb-8 flex-wrap">
-                              {formation.midfielders.map((pick) => (
-                                <PlayerCard key={pick.position} pick={pick} />
-                              ))}
-                            </div>
-
-                            {/* Defenders */}
-                            <div className="flex justify-center items-center gap-1 sm:gap-4 mb-2 sm:mb-8 flex-wrap">
-                              {formation.defenders.map((pick) => (
-                                <PlayerCard key={pick.position} pick={pick} />
-                              ))}
-                            </div>
-
-                            {/* Goalkeeper */}
-                            <div className="flex justify-center items-center">
-                              {formation.goalkeeper.map((pick) => (
-                                <PlayerCard key={pick.position} pick={pick} />
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })()}
                     </div>
 
-                    {/* Formation info */}
+                    {/* Formation Info */}
                     {(() => {
                       const formation = organizeByFormation(picksData.picks);
                       const formationString = `${formation.defenders.length}-${formation.midfielders.length}-${formation.forwards.length}`;
+
                       return (
-                        <div className="mt-4 text-center">
-                          <Badge variant="outline" className="text-sm">
-                            Formation: {formationString}
-                          </Badge>
+                        <div className="mt-4 text-center space-y-3">
+                          <div className="flex justify-center items-center gap-4 flex-wrap">
+                            <Badge variant="outline" className="text-sm px-3 py-1">
+                              ⚽ Sơ đồ: {formationString}
+                            </Badge>
+                          </div>
                         </div>
                       );
                     })()}
@@ -1078,19 +1306,32 @@ const PicksDialog = ({
             {/* Bench */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base sm:text-lg">Ghế dự bị</CardTitle>
+                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                  🪑 Ghế dự bị
+                </CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                <div className="bg-gray-100 rounded-lg p-2 sm:p-4">
-                  <div className="flex justify-center gap-1 sm:gap-3 flex-wrap">
-                    {picksData.picks
-                      .filter(pick => pick.position > 11)
-                      .sort((a, b) => a.position - b.position)
-                      .map((pick) => (
-                        <PlayerCard key={pick.position} pick={pick} isCompact={true} />
-                      ))}
+                {picksData?.picks.filter(pick => pick.position > 11).length > 0 ? (
+                  <div className="space-y-3">
+                    <div className="bg-gray-50 border-[1px] border-dashed border-gray-200 rounded-lg p-3 sm:p-4">
+                      <div className="flex justify-center gap-1 flex-wrap">
+                        {picksData.picks
+                          .filter(pick => pick.position > 11)
+                          .sort((a, b) => a.position - b.position)
+                          .map((pick) => (
+                            <div key={pick.position} className="relative w-[24%]">
+                              <PlayerCard pick={pick} isCompact={true} />
+                            </div>
+                            // <PlayerCard key={pick.position} pick={pick} isCompact={true} />
+                          ))}
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <span className="text-muted-foreground">Không có cầu thủ dự bị</span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -1105,9 +1346,25 @@ const PicksDialog = ({
 };
 
 // Component loading skeleton cho table
-const TableSkeleton = () => (
+const TableSkeleton = ({ isSearching = false }: { isSearching?: boolean }) => (
   <>
-    {Array.from({ length: 8 }).map((_, index) => (
+    {/* Show search status message if searching */}
+    {isSearching && (
+      <TableRow>
+        <TableCell colSpan={5} className="text-center py-4">
+          <div className="flex flex-col items-center justify-center space-y-2">
+            <div className="flex items-center gap-2 text-blue-600">
+              <span className="animate-spin">⏳</span>
+              <span className="font-medium">Đang tìm kiếm trong toàn bộ league...</span>
+            </div>
+            <span className="text-xs text-muted-foreground">
+              Đang tải dữ liệu, vui lòng đợi một chút
+            </span>
+          </div>
+        </TableCell>
+      </TableRow>
+    )}
+    {Array.from({ length: isSearching ? 6 : 8 }).map((_, index) => (
       <TableRow key={index}>
         <TableCell>
           <Skeleton className="h-6 w-12" />
@@ -1150,6 +1407,7 @@ export const FantasyLeaderboard = ({
   const [teamStats, setTeamStats] = useState<TeamStats[]>([]);
   const [leagueName, setLeagueName] = useState<string>("");
   const [currentGW, setCurrentGW] = useState<number>(0);
+  const [maxEntries, setMaxEntries] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(pageId);
   const [currentPhase, setCurrentPhase] = useState<number>(phase);
   const [hasNextPage, setHasNextPage] = useState<boolean>(false);
@@ -1159,6 +1417,14 @@ export const FantasyLeaderboard = ({
   const [inputLeagueId, setInputLeagueId] = useState<string>(leagueId);
   const [currentLeagueId, setCurrentLeagueId] = useState<string>(leagueId);
   const [activeTab, setActiveTab] = useState<'leaderboard' | 'fixtures'>('leaderboard');
+  const [searchManager, setSearchManager] = useState<string>('');
+  const [allLeaderboardData, setAllLeaderboardData] = useState<LeaderboardEntry[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchProgress, setSearchProgress] = useState<{ loaded: number, total: number, found?: number } | null>(null);
+  const [smartSearchEnabled, setSmartSearchEnabled] = useState(false);
+  const [searchHasMore, setSearchHasMore] = useState(false);
+  const [searchResults, setSearchResults] = useState<LeaderboardEntry[]>([]);
+  const [foundExactMatch, setFoundExactMatch] = useState(false);
 
   // Pre-load bootstrap data khi component mount
   useEffect(() => {
@@ -1185,6 +1451,25 @@ export const FantasyLeaderboard = ({
     setMounted(true);
   }, []);
 
+  // Auto-enable smart search khi có allLeaderboardData và đang có search term
+  useEffect(() => {
+    if (searchManager.trim() && allLeaderboardData.length > 0 && !smartSearchEnabled && !isSearching) {
+      setSmartSearchEnabled(true);
+    }
+  }, [searchManager, allLeaderboardData, smartSearchEnabled, isSearching]);
+
+  // Auto-reset smart search khi searchManager trống
+  useEffect(() => {
+    if (!searchManager.trim()) {
+      setSmartSearchEnabled(false);
+      setIsSearching(false);
+      setSearchProgress(null);
+      setSearchHasMore(false);
+      setSearchResults([]);
+      setFoundExactMatch(false);
+    }
+  }, [searchManager]);
+
   // Fetch dữ liệu khi component mount hoặc khi thông số thay đổi
   useEffect(() => {
     const loadLeaderboardData = async () => {
@@ -1193,10 +1478,12 @@ export const FantasyLeaderboard = ({
 
       try {
         const result = await fetchLeaderboardData(currentLeagueId, currentPage, currentPhase);
+
         setLeaderboardData(result.entries);
         setLeagueName(result.leagueName);
         setCurrentGW(result.currentGW);
         setHasNextPage(result.hasNext);
+        setMaxEntries(result.maxEntries);
 
         // Tính toán thống kê team chỉ khi là league của vntrip
         if (currentLeagueId === VNTRIP_LEAGUE_ID) {
@@ -1211,6 +1498,7 @@ export const FantasyLeaderboard = ({
         setLeagueName("Không thể tải dữ liệu league");
         setCurrentGW(0);
         setTeamStats([]);
+        setMaxEntries(null);
       } finally {
         setIsLoading(false);
       }
@@ -1218,8 +1506,13 @@ export const FantasyLeaderboard = ({
 
     if (mounted) {
       loadLeaderboardData();
+      // Clear search data khi đổi league
+      if (currentLeagueId !== leagueId) {
+        setAllLeaderboardData([]);
+        setSearchManager('');
+      }
     }
-  }, [currentPage, currentPhase, currentLeagueId, mounted]);
+  }, [currentPage, currentPhase, currentLeagueId, mounted, leagueId]);
 
   const handleLeagueIdSubmit = () => {
     if (inputLeagueId.trim()) {
@@ -1250,6 +1543,73 @@ export const FantasyLeaderboard = ({
     if (pageNumber >= 1) {
       setCurrentPage(pageNumber);
     }
+  };
+
+  // Filter leaderboard data based on search - SMART FILTERING
+  const filteredLeaderboardData = useMemo(() => {
+    if (!searchManager.trim()) {
+      return leaderboardData; // Normal pagination mode khi không có search
+    }
+
+    if (smartSearchEnabled && searchResults.length > 0) {
+      // Smart search mode - use search results
+      return searchResults;
+    } else {
+      // Fallback - search in current page only
+      return leaderboardData.filter(entry =>
+        entry.manager.toLowerCase().includes(searchManager.toLowerCase()) ||
+        entry.teamName.toLowerCase().includes(searchManager.toLowerCase())
+      );
+    }
+  }, [searchManager, smartSearchEnabled, searchResults, leaderboardData]);  // Hàm xử lý search thông minh
+  const handleSearch = async (searchTerm: string) => {
+    // Nếu không có search term, reset về normal mode
+    if (!searchTerm.trim()) {
+      setSmartSearchEnabled(false);
+      setSearchProgress(null);
+      setSearchResults([]);
+      setFoundExactMatch(false);
+      return;
+    }
+
+    setIsSearching(true);
+    setSmartSearchEnabled(false); // Tạm thời tắt để hiển thị loading
+
+    try {
+      // Sử dụng smart search với early termination
+      const result = await smartSearchLeaderboard(
+        currentLeagueId,
+        searchTerm,
+        maxEntries,
+        (loaded, total, found) => setSearchProgress({ loaded, total: Math.max(total, loaded), found })
+      );
+
+      setSearchResults(result.entries);
+      setSearchHasMore(result.hasMore);
+      setFoundExactMatch(result.foundExactMatch);
+      setSmartSearchEnabled(true); // Bật sau khi có data
+
+      console.log(`🔍 Search completed: ${result.entries.length} results, exact match: ${result.foundExactMatch}`);
+    } catch (error) {
+      console.error('Error during smart search:', error);
+      setSmartSearchEnabled(false);
+      setSearchResults([]);
+      setFoundExactMatch(false);
+    } finally {
+      setIsSearching(false);
+      setSearchProgress(null);
+    }
+  };
+
+  const handleClearSearch = () => {
+    setSearchManager('');
+    setSmartSearchEnabled(false);
+    setSearchProgress(null);
+    setIsSearching(false);
+    setSearchHasMore(false);
+    setSearchResults([]);
+    setFoundExactMatch(false);
+    // Keep allLeaderboardData for potential future use
   };
 
   return (
@@ -1327,9 +1687,21 @@ export const FantasyLeaderboard = ({
                 <h3 className="text-lg font-semibold mb-2">
                   {leagueName || "Đang tải..."} {leagueName && <span className="text-sm text-muted-foreground font-normal">(ID: {currentLeagueId})</span>}
                 </h3>
-                <p className="text-sm text-muted-foreground">
-                  Gameweek hiện tại: {currentGW > 0 ? currentGW : "Đang tải..."}
-                </p>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 text-sm text-muted-foreground">
+                  <div>
+                    Gameweek hiện tại: <span className="font-medium">{currentGW > 0 ? currentGW : "Đang tải..."}</span>
+                  </div>
+                  {maxEntries && (
+                    <div className="flex items-center gap-1">
+                      👥 Giới hạn league: <span className="font-medium text-blue-600">{maxEntries.toLocaleString()}</span> manager
+                    </div>
+                  )}
+                  {smartSearchEnabled && filteredLeaderboardData.length > 0 && (
+                    <div className="flex items-center gap-1 flex-wrap">
+                      🔍 Kết quả tìm thấy: <span className="font-medium text-green-600">{searchResults.length.toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Team Stats Section - chỉ hiển thị cho league vntrip */}
@@ -1376,6 +1748,114 @@ export const FantasyLeaderboard = ({
                 </div>
               )}
 
+              {/* Search Manager Section */}
+              <div className="mb-4">
+                <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                  <label className="text-sm font-medium whitespace-nowrap">
+                    Tìm kiếm Manager/Team:
+                  </label>
+                  <div className="flex flex-1 gap-2">
+                    <Input
+                      type="text"
+                      placeholder="Nhập tên manager hoặc tên team..."
+                      value={searchManager}
+                      onChange={(e) => setSearchManager(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          handleSearch(searchManager);
+                        }
+                      }}
+                      className="flex-1 sm:max-w-xs"
+                      disabled={isLoading || isSearching}
+                    />
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => handleSearch(searchManager)}
+                      disabled={isLoading || isSearching || !searchManager.trim()}
+                      className="whitespace-nowrap"
+                    >
+                      {isSearching ? (
+                        <>
+                          <span className="animate-spin mr-1">⏳</span>
+                          Đang tìm...
+                        </>
+                      ) : (
+                        <>
+                          🔍 Tìm kiếm
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  {searchManager && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleClearSearch}
+                      className="w-full sm:w-auto"
+                      disabled={isSearching}
+                    >
+                      Xóa
+                    </Button>
+                  )}
+                  {isSearching && (
+                    <div className="text-xs text-blue-600 whitespace-nowrap flex items-center gap-2 flex-wrap">
+                      <span className="flex items-center gap-1">
+                        <span className="animate-spin">⏳</span>
+                        Đang tải toàn bộ league...
+                      </span>
+                      {searchProgress && (
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-mono">
+                          {searchProgress.loaded}/{searchProgress.total} trang
+                          {searchProgress.found !== undefined && (
+                            <span className="ml-1 text-green-600">
+                              • {searchProgress.found} kết quả
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Search Tips */}
+                <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                  💡 <span>Có thể tìm kiếm theo tên manager (ví dụ: &quot;John&quot;) hoặc tên team (ví dụ: &quot;Arsenal FC&quot;)</span>
+                </div>
+
+                {searchManager && (
+                  <p className="text-xs text-muted-foreground mt-2 bg-muted/30 p-2 rounded">
+                    {isSearching ? (
+                      <span className="text-blue-600 flex items-center gap-1">
+                        <span className="animate-spin">⏳</span>
+                        Đang tìm kiếm thông minh...
+                      </span>
+                    ) : smartSearchEnabled && searchResults.length > 0 ? (
+                      <span className="text-green-600">
+                        {foundExactMatch ? (
+                          <>
+                            🎯 <strong>Tìm thấy kết quả chính xác!</strong> Hiển thị {filteredLeaderboardData.length} kết quả
+                          </>
+                        ) : (
+                          <>
+                            🔍 Search thông minh: <strong>{filteredLeaderboardData.length}</strong> kết quả tìm thấy
+                            <br />
+                            <span className="text-xs mt-1 block">💡 Có thể tìm theo tên manager hoặc tên team</span>
+                          </>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="text-orange-600">
+                        📄 Tìm kiếm trang hiện tại: <strong>{filteredLeaderboardData.length}</strong> / {leaderboardData.length} kết quả
+                        <span className="block text-xs mt-1">
+                          💡 Nhấn nút &quot;🔍 Tìm kiếm&quot; để search thông minh
+                        </span>
+                      </span>
+                    )}
+                  </p>
+                )}
+              </div>
+
               <div className="rounded-md border overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -1388,8 +1868,8 @@ export const FantasyLeaderboard = ({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {isLoading ? (
-                      <TableSkeleton />
+                    {(isLoading || isSearching) ? (
+                      <TableSkeleton isSearching={isSearching} />
                     ) : error ? (
                       <TableRow>
                         <TableCell colSpan={5} className="text-center py-8">
@@ -1405,12 +1885,20 @@ export const FantasyLeaderboard = ({
                           <span className="text-muted-foreground">Không có dữ liệu</span>
                         </TableCell>
                       </TableRow>
+                    ) : filteredLeaderboardData.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-8">
+                          <span className="text-muted-foreground">
+                            Không tìm thấy manager hoặc team nào với từ khóa &quot;{searchManager}&quot;
+                          </span>
+                        </TableCell>
+                      </TableRow>
                     ) : (
-                      leaderboardData.map((entry) => {
+                      filteredLeaderboardData.map((entry: LeaderboardEntry) => {
                         const team = currentLeagueId === VNTRIP_LEAGUE_ID ? getTeamForEntry(entry.entry) : null;
                         return (
                           <TableRow
-                            key={entry.rank}
+                            key={`${entry.entry}-${entry.rank}`}
                             className={`${entry.rank <= 3 ? "bg-muted/50" : ""} ${team ? "border-l-4" : ""}`}
                             style={team ? { borderLeftColor: team.color.replace('bg-', '#') } : {}}
                           >
@@ -1453,8 +1941,8 @@ export const FantasyLeaderboard = ({
                 </Table>
               </div>
 
-              {/* Pagination Controls */}
-              {!isLoading && leaderboardData.length > 0 && (
+              {/* Pagination Controls - chỉ hiển thị khi không search toàn bộ */}
+              {!isLoading && !smartSearchEnabled && filteredLeaderboardData.length > 0 && (
                 <div className="mt-4 space-y-3 sm:space-y-0 sm:flex sm:justify-between sm:items-center">
                   <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
                     <Button
@@ -1494,6 +1982,35 @@ export const FantasyLeaderboard = ({
                   </div>
                   <div className="text-xs sm:text-sm text-muted-foreground text-center sm:text-right">
                     {hasNextPage ? "Có thêm trang" : "Đã hết dữ liệu"}
+                  </div>
+                </div>
+              )}
+
+              {/* Search Results Info - hiển thị khi đang search */}
+              {smartSearchEnabled && filteredLeaderboardData.length > 0 && (
+                <div className="mt-4 text-center">
+                  <div className="text-xs sm:text-sm text-muted-foreground">
+                    {foundExactMatch ? (
+                      <div className="bg-green-50 border border-green-200 rounded p-3">
+                        <div className="text-green-800 font-medium">
+                          🎯 Tìm thấy kết quả chính xác! Hiển thị {filteredLeaderboardData.length} kết quả phù hợp
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        🔍 Hiển thị {filteredLeaderboardData.length} kết quả từ search thông minh
+                        {searchHasMore && (
+                          <span className="block text-xs text-amber-600 mt-1 bg-amber-50 inline-block px-2 py-1 rounded">
+                            ⚠️ Có thể còn nhiều kết quả khác - search đã dừng để tối ưu hiệu suất
+                          </span>
+                        )}
+                      </>
+                    )}
+                    {maxEntries && (
+                      <span className="block text-xs text-blue-600 mt-1">
+                        👥 League có giới hạn {maxEntries.toLocaleString()} manager
+                      </span>
+                    )}
                   </div>
                 </div>
               )}
