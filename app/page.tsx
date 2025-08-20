@@ -1,30 +1,21 @@
 import { FantasyLeaderboard } from "@/components/fantasy-leaderboard";
+import { Metadata } from "next";
 
-export const metadata = {
-  title: "Fantasy Premier League - Bảng Xếp Hạng",
-  description: "Bảng xếp hạng Fantasy Premier League với thống kê điểm số theo League ID",
+export const metadata: Metadata = {
+  title: "Fantasy Premier League Leaderboard - FPL Vntrip",
+  description: "View and track Fantasy Premier League leaderboards with detailed team statistics and player information. Real-time points, team formations, and live scoring data.",
+  keywords: ["Fantasy Premier League", "FPL", "leaderboard", "football", "soccer", "vntrip"],
+  authors: [{ name: "Nguyen Tuan" }],
   openGraph: {
+    title: "Fantasy Premier League Leaderboard - FPL Vntrip",
+    description: "View and track Fantasy Premier League leaderboards with detailed team statistics and player information.",
     type: "website",
-    url: "https://github.com/nobruf/shadcn-landing-page.git",
-    title: "Fantasy Premier League - Bảng Xếp Hạng",
-    description: "Bảng xếp hạng Fantasy Premier League với thống kê điểm số theo League ID",
-    images: [
-      {
-        url: "https://res.cloudinary.com/dbzv9xfjp/image/upload/v1723499276/og-images/shadcn-vue.jpg",
-        width: 1200,
-        height: 630,
-        alt: "Shadcn - Landing template",
-      },
-    ],
+    locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
-    site: "https://github.com/nobruf/shadcn-landing-page.git",
-    title: "Fantasy Premier League - Bảng Xếp Hạng",
-    description: "Bảng xếp hạng Fantasy Premier League với thống kê điểm số theo League ID",
-    images: [
-      "https://res.cloudinary.com/dbzv9xfjp/image/upload/v1723499276/og-images/shadcn-vue.jpg",
-    ],
+    title: "Fantasy Premier League Leaderboard - FPL Vntrip",
+    description: "View and track Fantasy Premier League leaderboards with detailed team statistics and player information.",
   },
 };
 
