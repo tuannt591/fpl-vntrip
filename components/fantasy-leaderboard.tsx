@@ -1614,7 +1614,7 @@ export const FantasyLeaderboard = ({
   return (
     <div className="container mx-auto py-4 sm:py-8">
       <Card>
-        <CardHeader className="pb-4">
+        <CardHeader className="pb-4 mb-4">
           {/* Title Section - Always visible */}
           <div className="space-y-4">
             <div>
@@ -1628,21 +1628,21 @@ export const FantasyLeaderboard = ({
 
             {/* League ID Input Section - Only visible on leaderboard tab */}
             {activeTab === 'leaderboard' && (
-              <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex gap-2">
                 <Input
                   type="text"
                   placeholder="Nhập League ID"
                   value={inputLeagueId}
                   onChange={(e) => setInputLeagueId(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  className="flex-1 sm:w-40 sm:flex-none"
+                  className="flex-1 sm:w-[20rem] sm:flex-none"
                   disabled={isLoading}
                 />
                 <Button
                   onClick={handleLeagueIdSubmit}
                   disabled={isLoading || !inputLeagueId.trim()}
                   size="sm"
-                  className="w-full sm:w-auto"
+                  className="w-[100px]"
                 >
                   Tải
                 </Button>
