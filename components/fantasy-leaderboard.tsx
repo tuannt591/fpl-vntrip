@@ -1319,10 +1319,9 @@ const PicksDialog = ({
                           .filter(pick => pick.position > 11)
                           .sort((a, b) => a.position - b.position)
                           .map((pick) => (
-                            <div key={pick.position} className="relative w-[24%]">
+                            <div key={pick.position} className="relative w-[23%]">
                               <PlayerCard pick={pick} isCompact={true} />
                             </div>
-                            // <PlayerCard key={pick.position} pick={pick} isCompact={true} />
                           ))}
                       </div>
                     </div>
