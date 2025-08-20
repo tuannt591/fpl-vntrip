@@ -184,24 +184,6 @@ type Fixture = {
   }>;
 };
 
-type PremierLeagueStanding = {
-  position: number;
-  team: {
-    id: number;
-    name: string;
-    short_name: string;
-    crest: string;
-  };
-  playedGames: number;
-  won: number;
-  draw: number;
-  lost: number;
-  points: number;
-  goalsFor: number;
-  goalsAgainst: number;
-  goalDifference: number;
-};
-
 interface FantasyLeaderboardProps {
   leagueId?: string;
   pageId?: number;
@@ -279,28 +261,6 @@ const fetchFixtures = async (): Promise<Fixture[] | null> => {
     return data || [];
   } catch (error) {
     console.error('Error fetching fixtures:', error);
-    return null;
-  }
-};
-
-// Hàm để fetch dữ liệu bảng xếp hạng Premier League
-const fetchPremierLeagueStandings = async (): Promise<PremierLeagueStanding[] | null> => {
-  try {
-    const response = await fetch('/api/fantasy-standings', {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data || [];
-  } catch (error) {
-    console.error('Error fetching standings:', error);
     return null;
   }
 };
@@ -506,6 +466,7 @@ const FixturesTab = () => {
     });
   };
 
+
   const getFixtureStatus = (fixture: Fixture) => {
     if (fixture.finished) return 'FT';
     if (fixture.started) return `${fixture.minutes}'`;
@@ -625,128 +586,6 @@ const FixturesTab = () => {
           Hiển thị {filteredFixtures.length} trận đấu trong Gameweek {selectedGameweek}
         </div>
       )}
-    </div>
-  );
-};
-
-// Component hiển thị bảng xếp hạng
-const StandingsTab = () => {
-  const [standings, setStandings] = useState<PremierLeagueStanding[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    loadStandings();
-  }, []);
-
-  const loadStandings = async () => {
-    setIsLoading(true);
-    try {
-      const standingsData = await fetchPremierLeagueStandings();
-      if (standingsData) {
-        // Sort by position for better display
-        const sortedStandings = standingsData.sort((a, b) => a.position - b.position);
-        setStandings(sortedStandings);
-      }
-    } catch (error) {
-      console.error('Error loading standings:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const getPositionBadge = (position: number) => {
-    if (position <= 4) {
-      return <Badge className="bg-green-600 text-white">{position}</Badge>;
-    } else if (position <= 6) {
-      return <Badge className="bg-blue-600 text-white">{position}</Badge>;
-    } else if (position >= 18) {
-      return <Badge className="bg-red-600 text-white">{position}</Badge>;
-    } else {
-      return <Badge variant="outline">{position}</Badge>;
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="space-y-2">
-        {Array.from({ length: 20 }).map((_, index) => (
-          <Skeleton key={index} className="h-12 w-full" />
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      {/* Legend - Stack on mobile */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <Badge className="bg-green-600 text-white text-xs">1-4</Badge>
-          <span>Champions League</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge className="bg-blue-600 text-white text-xs">5-6</Badge>
-          <span>Europa League</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge className="bg-red-600 text-white text-xs">18-20</Badge>
-          <span>Relegation</span>
-        </div>
-      </div>
-
-      <div className="rounded-md border overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[50px] sm:w-[60px]">Pos</TableHead>
-              <TableHead className="min-w-[100px]">Team</TableHead>
-              <TableHead className="text-center w-[40px] sm:w-[60px]">P</TableHead>
-              <TableHead className="text-center w-[40px] sm:w-[60px] hidden sm:table-cell">W</TableHead>
-              <TableHead className="text-center w-[40px] sm:w-[60px] hidden sm:table-cell">D</TableHead>
-              <TableHead className="text-center w-[40px] sm:w-[60px] hidden sm:table-cell">L</TableHead>
-              <TableHead className="text-center w-[50px] sm:w-[80px] hidden md:table-cell">GF</TableHead>
-              <TableHead className="text-center w-[50px] sm:w-[80px] hidden md:table-cell">GA</TableHead>
-              <TableHead className="text-center w-[50px] sm:w-[80px]">GD</TableHead>
-              <TableHead className="text-center w-[50px] sm:w-[60px]">Pts</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {standings.map((team) => (
-              <TableRow key={team.team.id}>
-                <TableCell className="font-medium text-center">
-                  {getPositionBadge(team.position)}
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-col">
-                    <div className="font-medium text-sm sm:text-base">{team.team.short_name}</div>
-                    <div className="text-xs text-muted-foreground sm:hidden">
-                      W{team.won} D{team.draw} L{team.lost}
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell className="text-center text-sm">{team.playedGames}</TableCell>
-                <TableCell className="text-center text-sm hidden sm:table-cell">{team.won}</TableCell>
-                <TableCell className="text-center text-sm hidden sm:table-cell">{team.draw}</TableCell>
-                <TableCell className="text-center text-sm hidden sm:table-cell">{team.lost}</TableCell>
-                <TableCell className="text-center text-sm hidden md:table-cell">{team.goalsFor || '-'}</TableCell>
-                <TableCell className="text-center text-sm hidden md:table-cell">{team.goalsAgainst || '-'}</TableCell>
-                <TableCell className="text-center text-sm">
-                  <span className={`${team.goalDifference > 0 ? 'text-green-600' : team.goalDifference < 0 ? 'text-red-600' : ''}`}>
-                    {team.goalDifference > 0 ? '+' : ''}{team.goalDifference || '-'}
-                  </span>
-                </TableCell>
-                <TableCell className="text-center font-bold text-sm">{team.points}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      <div className="text-center text-sm text-muted-foreground">
-        * Bảng xếp hạng được tạo từ dữ liệu Fantasy Premier League
-        <br />
-        * Một số thống kê có thể không khả dụng
-      </div>
     </div>
   );
 };
@@ -954,7 +793,7 @@ const PicksDialog = ({
             </div>
           </div>
         </DialogTrigger>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-sm sm:max-w-md max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {playerInfo.name}
@@ -1089,7 +928,7 @@ const PicksDialog = ({
     const playerPoints = getPlayerPoints(pick.element);
 
     return (
-      <div className={`relative ${isCompact ? 'w-12 sm:w-16' : 'w-14 sm:w-20'} text-center`}>
+      <div className={`relative ${isCompact ? 'w-10 sm:w-16' : 'w-12 sm:w-20'} text-center`}>
         <PlayerDetailDialog
           pick={pick}
           playerInfo={playerInfo}
@@ -1114,7 +953,7 @@ const PicksDialog = ({
           </div>
         </button>
       </DialogTrigger>
-      <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto p-3 sm:p-6">
+      <DialogContent className="max-w-sm sm:max-w-lg md:max-w-2xl max-h-[85vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-base sm:text-lg">Đội hình - Gameweek {eventId}</DialogTitle>
           <DialogDescription className="text-sm">
@@ -1167,38 +1006,38 @@ const PicksDialog = ({
                 {picksData.picks.length > 0 ? (
                   <div className="relative">
                     {/* Football pitch background */}
-                    <div className="bg-gradient-to-b from-green-400 to-green-500 rounded-lg p-3 sm:p-6 min-h-[400px] sm:min-h-[500px] relative overflow-hidden">
+                    <div className="bg-gradient-to-b from-green-400 to-green-500 rounded-lg p-2 sm:p-6 min-h-[300px] sm:min-h-[500px] relative overflow-hidden">
                       {/* Pitch markings */}
                       <div className="absolute inset-0 opacity-20">
                         {/* Center circle */}
-                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 sm:w-32 sm:h-32 border-2 border-white rounded-full"></div>
+                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-16 h-16 sm:w-32 sm:h-32 border-2 border-white rounded-full"></div>
                         {/* Center line */}
                         <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-white"></div>
                         {/* Goal areas */}
-                        <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-16 h-6 sm:w-24 sm:h-8 border-b-2 border-l-2 border-r-2 border-white"></div>
-                        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-16 h-6 sm:w-24 sm:h-8 border-t-2 border-l-2 border-r-2 border-white"></div>
+                        <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-12 h-4 sm:w-24 sm:h-8 border-b-2 border-l-2 border-r-2 border-white"></div>
+                        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-12 h-4 sm:w-24 sm:h-8 border-t-2 border-l-2 border-r-2 border-white"></div>
                       </div>
 
                       {(() => {
                         const formation = organizeByFormation(picksData.picks);
                         return (
-                          <div className="relative h-full flex flex-col justify-between py-2 sm:py-4">
+                          <div className="relative h-full flex flex-col justify-between py-1 sm:py-4">
                             {/* Forwards */}
-                            <div className="flex justify-center items-center gap-2 sm:gap-4 mb-4 sm:mb-8">
+                            <div className="flex justify-center items-center gap-1 sm:gap-4 mb-2 sm:mb-8">
                               {formation.forwards.map((pick) => (
                                 <PlayerCard key={pick.position} pick={pick} />
                               ))}
                             </div>
 
                             {/* Midfielders */}
-                            <div className="flex justify-center items-center gap-2 sm:gap-4 mb-4 sm:mb-8 flex-wrap">
+                            <div className="flex justify-center items-center gap-1 sm:gap-4 mb-2 sm:mb-8 flex-wrap">
                               {formation.midfielders.map((pick) => (
                                 <PlayerCard key={pick.position} pick={pick} />
                               ))}
                             </div>
 
                             {/* Defenders */}
-                            <div className="flex justify-center items-center gap-2 sm:gap-4 mb-4 sm:mb-8 flex-wrap">
+                            <div className="flex justify-center items-center gap-1 sm:gap-4 mb-2 sm:mb-8 flex-wrap">
                               {formation.defenders.map((pick) => (
                                 <PlayerCard key={pick.position} pick={pick} />
                               ))}
@@ -1242,8 +1081,8 @@ const PicksDialog = ({
                 <CardTitle className="text-base sm:text-lg">Ghế dự bị</CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                <div className="bg-gray-100 rounded-lg p-3 sm:p-4">
-                  <div className="flex justify-center gap-2 sm:gap-3 flex-wrap">
+                <div className="bg-gray-100 rounded-lg p-2 sm:p-4">
+                  <div className="flex justify-center gap-1 sm:gap-3 flex-wrap">
                     {picksData.picks
                       .filter(pick => pick.position > 11)
                       .sort((a, b) => a.position - b.position)
@@ -1319,7 +1158,7 @@ export const FantasyLeaderboard = ({
   const [error, setError] = useState<string | null>(null);
   const [inputLeagueId, setInputLeagueId] = useState<string>(leagueId);
   const [currentLeagueId, setCurrentLeagueId] = useState<string>(leagueId);
-  const [activeTab, setActiveTab] = useState<'leaderboard' | 'fixtures' | 'standings'>('leaderboard');
+  const [activeTab, setActiveTab] = useState<'leaderboard' | 'fixtures'>('leaderboard');
 
   // Pre-load bootstrap data khi component mount
   useEffect(() => {
@@ -1424,7 +1263,7 @@ export const FantasyLeaderboard = ({
                 Fantasy Premier League Dashboard
               </CardTitle>
               <CardDescription>
-                Thống kê điểm số, lịch thi đấu và bảng xếp hạng Premier League
+                Thống kê điểm số và lịch thi đấu Fantasy Premier League
               </CardDescription>
             </div>
 
@@ -1474,15 +1313,6 @@ export const FantasyLeaderboard = ({
                   }`}
               >
                 📅 Lịch thi đấu
-              </button>
-              <button
-                onClick={() => setActiveTab('standings')}
-                className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap ${activeTab === 'standings'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                  }`}
-              >
-                📊 Bảng xếp hạng Premier League
               </button>
             </div>
           </div>
@@ -1671,7 +1501,6 @@ export const FantasyLeaderboard = ({
           )}
 
           {activeTab === 'fixtures' && <FixturesTab />}
-          {activeTab === 'standings' && <StandingsTab />}
 
           {!isLoading && (
             <div className="mt-4 flex justify-between items-center text-sm text-muted-foreground">
