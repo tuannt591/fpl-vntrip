@@ -19,6 +19,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import {
+  TooltipWithIcon,
+} from "@/components/ui/tooltip";
 
 // Cấu trúc dữ liệu từ API Fantasy Premier League
 type APILeaderboardEntry = {
@@ -956,15 +959,51 @@ const PricesTab = () => {
                   <TableRow>
                     <TableHead className="w-12">#</TableHead>
                     <TableHead className="min-w-[200px]">Cầu thủ</TableHead>
-                    <TableHead className="text-center min-w-[80px]" title="Vị trí của cầu thủ (GKP/DEF/MID/FWD)">Vị trí</TableHead>
-                    <TableHead className="text-center min-w-[80px]" title="Đội bóng hiện tại">Đội</TableHead>
-                    <TableHead className="text-center min-w-[80px]" title="Giá hiện tại của cầu thủ (£x.xm)">Giá</TableHead>
-                    <TableHead className="text-center min-w-[100px]" title="Tỷ lệ % người chơi FPL sở hữu cầu thủ này">% Sở hữu</TableHead>
-                    <TableHead className="text-center min-w-[100px]" title="Xu hướng thay đổi giá dựa trên hoạt động chuyển nhượng">Xu hướng</TableHead>
-                    <TableHead className="text-center min-w-[100px]" title="Số lượng người chơi mua cầu thủ trong gameweek hiện tại">Mua vào</TableHead>
-                    <TableHead className="text-center min-w-[100px]" title="Số lượng người chơi bán cầu thủ trong gameweek hiện tại">Bán ra</TableHead>
-                    <TableHead className="text-center min-w-[100px]" title="Điểm trung bình trong 5 gameweek gần nhất">Phong độ</TableHead>
-                    <TableHead className="text-center min-w-[120px]" title="Tình trạng sức khỏe và đình chỉ của cầu thủ">Trạng thái</TableHead>
+                    <TableHead className="text-center min-w-[80px]">
+                      <TooltipWithIcon label="Vị trí">
+                        Vị trí của cầu thủ (GKP/DEF/MID/FWD)
+                      </TooltipWithIcon>
+                    </TableHead>
+                    <TableHead className="text-center min-w-[80px]">
+                      <TooltipWithIcon label="Đội">
+                        Đội bóng hiện tại
+                      </TooltipWithIcon>
+                    </TableHead>
+                    <TableHead className="text-center min-w-[80px]">
+                      <TooltipWithIcon label="Giá">
+                        Giá hiện tại của cầu thủ (£x.xm)
+                      </TooltipWithIcon>
+                    </TableHead>
+                    <TableHead className="text-center min-w-[100px]">
+                      <TooltipWithIcon label="% Sở hữu">
+                        Tỷ lệ % người chơi FPL sở hữu cầu thủ này
+                      </TooltipWithIcon>
+                    </TableHead>
+                    <TableHead className="text-center min-w-[100px]">
+                      <TooltipWithIcon label="Xu hướng">
+                        Xu hướng thay đổi giá dựa trên hoạt động chuyển nhượng
+                      </TooltipWithIcon>
+                    </TableHead>
+                    <TableHead className="text-center min-w-[100px]">
+                      <TooltipWithIcon label="Mua vào">
+                        Số lượng người chơi mua cầu thủ trong gameweek hiện tại
+                      </TooltipWithIcon>
+                    </TableHead>
+                    <TableHead className="text-center min-w-[100px]">
+                      <TooltipWithIcon label="Bán ra">
+                        Số lượng người chơi bán cầu thủ trong gameweek hiện tại
+                      </TooltipWithIcon>
+                    </TableHead>
+                    <TableHead className="text-center min-w-[100px]">
+                      <TooltipWithIcon label="Phong độ">
+                        Điểm trung bình trong 5 gameweek gần nhất
+                      </TooltipWithIcon>
+                    </TableHead>
+                    <TableHead className="text-center min-w-[120px]">
+                      <TooltipWithIcon label="Trạng thái">
+                        Tình trạng sức khỏe và đình chỉ của cầu thủ
+                      </TooltipWithIcon>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
