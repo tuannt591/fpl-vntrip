@@ -1,6 +1,5 @@
 "use client";
-
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import {
   Table,
@@ -600,10 +599,100 @@ const FixturesTab = () => {
   const [playerData, setPlayerData] = useState<PlayerData | null>(null);
   const [selectedGameweek, setSelectedGameweek] = useState<number | null>(null);
   const [availableGameweeks, setAvailableGameweeks] = useState<number[]>([]);
+  const [liveUpdatesEnabled, setLiveUpdatesEnabled] = useState(false);
+  const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
+  const [nextRefreshIn, setNextRefreshIn] = useState<number>(0);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownRef = useRef<NodeJS.Timeout | null>(null);
+
+  const loadFixtures = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [fixturesData, playersData] = await Promise.all([
+        fetchFixtures(),
+        globalDataCache.playerLoaded ? Promise.resolve(globalDataCache.player) : fetchPlayerData()
+      ]);
+
+      if (fixturesData) {
+        setFixtures(fixturesData);
+        // Get unique gameweeks for filter
+        const gameweeks = Array.from(new Set(fixturesData.map(f => f.event))).sort((a, b) => a - b);
+        setAvailableGameweeks(gameweeks);
+        setLastRefreshTime(new Date());
+      }
+      if (playersData) setPlayerData(playersData);
+    } catch (error) {
+      console.error('Error loading fixtures:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Start live updates for ongoing matches
+  const startLiveUpdates = useCallback(() => {
+    console.log('🔴 Starting live updates...');
+    setNextRefreshIn(60); // Start countdown
+
+    intervalRef.current = setInterval(() => {
+      loadFixtures();
+      setNextRefreshIn(60); // Reset countdown
+    }, 60000); // Update every 60 seconds
+  }, [loadFixtures]);
+
+  // Stop live updates
+  const stopLiveUpdates = useCallback(() => {
+    console.log('⏹️ Stopping live updates...');
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+    setNextRefreshIn(0);
+  }, []);
 
   useEffect(() => {
     loadFixtures();
-  }, []);
+  }, [loadFixtures]);
+
+  // Live updates effect
+  useEffect(() => {
+    if (liveUpdatesEnabled) {
+      startLiveUpdates();
+    } else {
+      stopLiveUpdates();
+    }
+
+    return () => stopLiveUpdates();
+  }, [liveUpdatesEnabled, startLiveUpdates, stopLiveUpdates]);
+
+  // Countdown effect
+  useEffect(() => {
+    if (liveUpdatesEnabled && nextRefreshIn > 0) {
+      countdownRef.current = setInterval(() => {
+        setNextRefreshIn(prev => {
+          if (prev <= 1) {
+            return 60; // Reset to 60 seconds
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+        countdownRef.current = null;
+      }
+    }
+
+    return () => {
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+        countdownRef.current = null;
+      }
+    };
+  }, [liveUpdatesEnabled, nextRefreshIn]);
 
   useEffect(() => {
     // Filter fixtures by selected gameweek
@@ -621,27 +710,23 @@ const FixturesTab = () => {
     }
   }, [selectedGameweek, fixtures]);
 
-  const loadFixtures = async () => {
-    setIsLoading(true);
-    try {
-      const [fixturesData, playersData] = await Promise.all([
-        fetchFixtures(),
-        globalDataCache.playerLoaded ? Promise.resolve(globalDataCache.player) : fetchPlayerData()
-      ]);
+  // Check if there are live matches
+  const hasLiveMatches = useMemo(() => {
+    return filteredFixtures.some(fixture => fixture.started && !fixture.finished);
+  }, [filteredFixtures]);
 
-      if (fixturesData) {
-        setFixtures(fixturesData);
-        // Get unique gameweeks for filter
-        const gameweeks = Array.from(new Set(fixturesData.map(f => f.event))).sort((a, b) => a - b);
-        setAvailableGameweeks(gameweeks);
-      }
-      if (playersData) setPlayerData(playersData);
-    } catch (error) {
-      console.error('Error loading fixtures:', error);
-    } finally {
-      setIsLoading(false);
+  // Toggle live updates
+  const toggleLiveUpdates = useCallback(() => {
+    setLiveUpdatesEnabled(!liveUpdatesEnabled);
+  }, [liveUpdatesEnabled]);
+
+  // Manual refresh
+  const handleManualRefresh = useCallback(async () => {
+    await loadFixtures();
+    if (liveUpdatesEnabled) {
+      setNextRefreshIn(60); // Reset countdown
     }
-  };
+  }, [loadFixtures, liveUpdatesEnabled]);
 
   const getTeamName = (teamId: number) => {
     if (!playerData) return `Team ${teamId}`;
@@ -663,7 +748,34 @@ const FixturesTab = () => {
   const getFixtureStatus = (fixture: Fixture) => {
     if (fixture.finished) return 'FT';
     if (fixture.started) return `${fixture.minutes}'`;
+
+    const kickoffTime = new Date(fixture.kickoff_time);
+    const now = new Date();
+
+    if (kickoffTime > now) {
+      return 'Scheduled';
+    }
+
     return 'Scheduled';
+  };
+
+  // Get live status badge style
+  const getStatusBadgeStyle = (fixture: Fixture) => {
+    if (fixture.finished) {
+      return "bg-gray-500 text-white";
+    }
+    if (fixture.started && !fixture.finished) {
+      return "bg-red-500 text-white animate-pulse"; // Live match - pulsing red
+    }
+    return "bg-blue-500 text-white"; // Scheduled
+  };
+
+  // Format match score display
+  const getScoreDisplay = (fixture: Fixture) => {
+    if (fixture.team_h_score !== null && fixture.team_a_score !== null) {
+      return `${fixture.team_h_score} - ${fixture.team_a_score}`;
+    }
+    return "vs";
   };
 
   if (isLoading) {
@@ -679,6 +791,69 @@ const FixturesTab = () => {
 
   return (
     <div className="space-y-6">
+      {/* Live Updates Controls */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between bg-muted/30 p-4 rounded-lg">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 items-start sm:items-center">
+          <div className="flex items-center gap-2">
+            <Button
+              variant={liveUpdatesEnabled ? "default" : "outline"}
+              size="sm"
+              onClick={toggleLiveUpdates}
+              className={liveUpdatesEnabled ? "bg-red-600 hover:bg-red-700" : ""}
+            >
+              {liveUpdatesEnabled ? (
+                <>
+                  <span className="w-2 h-2 bg-white rounded-full animate-pulse mr-2"></span>
+                  🔴 Live ON
+                </>
+              ) : (
+                <>⏸️ Live OFF</>
+              )}
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleManualRefresh}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <span className="animate-spin mr-1">⏳</span>
+                  Đang tải...
+                </>
+              ) : (
+                <>🔄 Refresh</>
+              )}
+            </Button>
+          </div>
+
+          {hasLiveMatches && (
+            <div className="flex items-center gap-2 text-green-600 font-medium">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              <span className="text-sm">Có trận đang diễn ra</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 items-start sm:items-center text-sm text-muted-foreground">
+          {liveUpdatesEnabled && nextRefreshIn > 0 && (
+            <div className="flex items-center gap-1">
+              <span>Next update in:</span>
+              <span className="font-mono bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
+                {nextRefreshIn}s
+              </span>
+            </div>
+          )}
+
+          {lastRefreshTime && (
+            <div className="text-xs">
+              Last updated: {lastRefreshTime.toLocaleTimeString('vi-VN')}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Gameweek Filter - Scrollable on mobile */}
       <div className="overflow-x-auto scrollbar-hide">
         <div className="flex gap-2 min-w-max pb-2">
@@ -712,7 +887,10 @@ const FixturesTab = () => {
           </div>
         ) : (
           filteredFixtures.map((fixture) => (
-            <Card key={fixture.id}>
+            <Card
+              key={fixture.id}
+              className={`${fixture.started && !fixture.finished ? 'border-green-500 shadow-lg' : ''}`}
+            >
               <CardContent className="p-3 sm:p-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
                   {/* Match Info */}
@@ -723,23 +901,23 @@ const FixturesTab = () => {
                     </div>
 
                     <div className="text-center px-2 sm:px-4">
-                      {fixture.started ? (
-                        <div>
-                          <div className="text-lg font-bold">
-                            {fixture.team_h_score ?? 0} - {fixture.team_a_score ?? 0}
-                          </div>
-                          <div className="text-xs sm:text-sm text-muted-foreground">
-                            {getFixtureStatus(fixture)}
-                          </div>
+                      <div>
+                        <div className="text-lg font-bold">
+                          {getScoreDisplay(fixture)}
                         </div>
-                      ) : (
-                        <div>
-                          <div className="text-lg font-bold">vs</div>
-                          <div className="text-xs sm:text-sm text-muted-foreground">
-                            {formatDate(fixture.kickoff_time)}
-                          </div>
+                        <div className="text-xs sm:text-sm text-muted-foreground">
+                          {fixture.started && !fixture.finished ? (
+                            <span className="flex items-center justify-center gap-1">
+                              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                              {getFixtureStatus(fixture)}
+                            </span>
+                          ) : fixture.started ? (
+                            getFixtureStatus(fixture)
+                          ) : (
+                            formatDate(fixture.kickoff_time)
+                          )}
                         </div>
-                      )}
+                      </div>
                     </div>
 
                     <div className="text-center min-w-[60px] sm:min-w-[80px]">
@@ -753,16 +931,22 @@ const FixturesTab = () => {
                     <Badge variant="outline" className="text-xs">
                       GW {fixture.event}
                     </Badge>
-                    {fixture.finished && (
-                      <Badge variant="secondary" className="text-xs">
-                        Finished
-                      </Badge>
-                    )}
-                    {fixture.started && !fixture.finished && (
-                      <Badge variant="default" className="text-xs bg-green-600">
-                        Live
-                      </Badge>
-                    )}
+
+                    <Badge
+                      className={`text-xs ${getStatusBadgeStyle(fixture)}`}
+                    >
+                      {fixture.finished ? (
+                        'FT'
+                      ) : fixture.started ? (
+                        <>
+                          <span className="w-2 h-2 bg-white rounded-full animate-pulse mr-1"></span>
+                          LIVE
+                        </>
+                      ) : (
+                        'Scheduled'
+                      )}
+                    </Badge>
+
                     <div className="text-xs text-muted-foreground hidden sm:block">
                       Difficulty: {fixture.team_h_difficulty} - {fixture.team_a_difficulty}
                     </div>
