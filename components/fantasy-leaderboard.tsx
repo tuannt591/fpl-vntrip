@@ -97,6 +97,10 @@ type Player = {
   second_name: string;
   element_type: number;
   team: number;
+  news: string;
+  status: string; // "a" = available, "d" = doubtful, "i" = injured, "u" = unavailable, "s" = suspended
+  chance_of_playing_this_round: number | null;
+  chance_of_playing_next_round: number | null;
 };
 
 type PlayerData = {
@@ -482,7 +486,7 @@ const fetchLeaderboardData = async (
   leagueId: string,
   pageId: number = 1,
   phase: number = 1
-): Promise<{ entries: LeaderboardEntry[], leagueName: string, currentGW: number, hasNext: boolean, currentPage: number, maxEntries: number | null }> => {
+): Promise<{ entries: LeaderboardEntry[], leagueName: string, currentGW: number, hasNext: boolean, currentPage: number, maxEntries: number | null, lastUpdatedData: string }> => {
   try {
     const params = new URLSearchParams({
       leagueId: leagueId,
@@ -519,7 +523,8 @@ const fetchLeaderboardData = async (
       currentGW: data.current_event || Math.max(...entries.map(entry => entry.gw)),
       hasNext: data.standings.has_next,
       currentPage: data.standings.page,
-      maxEntries: data.league.max_entries
+      maxEntries: data.league.max_entries,
+      lastUpdatedData: data.last_updated_data
     };
   } catch (error) {
     console.error('Error fetching leaderboard data:', error);
@@ -530,7 +535,8 @@ const fetchLeaderboardData = async (
       currentGW: 0,
       hasNext: false,
       currentPage: 1,
-      maxEntries: null
+      maxEntries: null,
+      lastUpdatedData: ""
     };
   }
 };
@@ -866,10 +872,10 @@ const PicksDialog = ({
 
   // Helper function to get player info
   const getPlayerInfo = (elementId: number) => {
-    if (!playerData) return { name: `Cầu thủ #${elementId}`, position: '', team: '' };
+    if (!playerData) return { name: `Cầu thủ #${elementId}`, position: '', team: '', news: '', status: 'a', chanceThisRound: null, chanceNextRound: null };
 
     const player = playerData.elements.find(p => p.id === elementId);
-    if (!player) return { name: `Cầu thủ #${elementId}`, position: '', team: '' };
+    if (!player) return { name: `Cầu thủ #${elementId}`, position: '', team: '', news: '', status: 'a', chanceThisRound: null, chanceNextRound: null };
 
     const position = playerData.element_types.find(et => et.id === player.element_type);
     const team = playerData.teams.find(t => t.id === player.team);
@@ -877,11 +883,52 @@ const PicksDialog = ({
     return {
       name: player.web_name,
       position: position?.singular_name_short || '',
-      team: team?.short_name || ''
+      team: team?.short_name || '',
+      news: player.news,
+      status: player.status,
+      chanceThisRound: player.chance_of_playing_this_round,
+      chanceNextRound: player.chance_of_playing_next_round
     };
   };
 
-  // Helper function to get player points
+  // Helper function to get injury status indicator (circular badge with exclamation mark)
+  const getInjuryStatusIndicator = (status: string, chanceThisRound: number | null, chanceNextRound: number | null, news: string) => {
+    let bgColor = '';
+    let shouldShow = false;
+
+    if (status === 'i') {
+      bgColor = 'from-red-500 to-red-600'; // Injured - red
+      shouldShow = true;
+    } else if (status === 'd') {
+      bgColor = 'from-yellow-500 to-yellow-600'; // Doubtful - yellow
+      shouldShow = true;
+    } else if (status === 's') {
+      bgColor = 'from-red-500 to-red-600'; // Suspended - red
+      shouldShow = true;
+    } else if (status === 'u') {
+      bgColor = 'from-gray-500 to-gray-600'; // Unavailable - gray
+      shouldShow = true;
+    } else if (chanceThisRound !== null && chanceThisRound < 100) {
+      if (chanceThisRound <= 25) {
+        bgColor = 'from-red-500 to-red-600'; // Low chance - red
+        shouldShow = true;
+      } else if (chanceThisRound <= 75) {
+        bgColor = 'from-yellow-500 to-yellow-600'; // Medium chance - yellow
+        shouldShow = true;
+      }
+      // Don't show green (high chance) anymore
+    }
+
+    if (shouldShow && bgColor) {
+      return (
+        <div className={`w-4 h-4 bg-gradient-to-r ${bgColor} rounded-full flex items-center justify-center text-[10px] font-bold border-[1px] border-white text-white`}>
+          !
+        </div>
+      );
+    }
+
+    return null;
+  };  // Helper function to get player points
   const getPlayerPoints = (elementId: number) => {
     if (!liveData) return 0;
     const livePlayer = liveData.elements.find(p => p.id === elementId);
@@ -925,7 +972,7 @@ const PicksDialog = ({
     isCompact = false
   }: {
     pick: Pick;
-    playerInfo: { name: string; position: string; team: string };
+    playerInfo: { name: string; position: string; team: string; news: string; status: string; chanceThisRound: number | null; chanceNextRound: number | null };
     playerPoints: number;
     isCompact?: boolean;
   }) => {
@@ -964,6 +1011,13 @@ const PicksDialog = ({
               </div>
             )}
 
+            {/* Injury status indicator - only show red/yellow warnings */}
+            {getInjuryStatusIndicator(playerInfo.status, playerInfo.chanceThisRound, playerInfo.chanceNextRound, playerInfo.news) && (
+              <div className="absolute -top-1 -left-1 sm:-top-1.5 sm:-left-1.5">
+                {getInjuryStatusIndicator(playerInfo.status, playerInfo.chanceThisRound, playerInfo.chanceNextRound, playerInfo.news)}
+              </div>
+            )}
+
             {/* Player name */}
             <div className={`font-medium w-full p-1 ${isCompact ? 'text-xs leading-tight' : 'text-xs sm:text-sm'} truncate`}>
               {playerInfo.name}
@@ -984,10 +1038,11 @@ const PicksDialog = ({
         </DialogTrigger>
         <DialogContent className="max-w-sm sm:max-w-md max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 flex-wrap">
               {playerInfo.name}
               {pick.is_captain && <Badge className="bg-yellow-500">Đội trưởng</Badge>}
-              {pick.is_vice_captain && <Badge className="bg-blue-500">Phó đội trưởng</Badge>}
+              {pick.is_vice_captain && <Badge className="bg-blue-500">Đội phó</Badge>}
+              {getInjuryStatusIndicator(playerInfo.status, playerInfo.chanceThisRound, playerInfo.chanceNextRound, playerInfo.news)}
             </DialogTitle>
             <DialogDescription>
               {playerInfo.position} - {playerInfo.team} | Gameweek {eventId}
@@ -995,6 +1050,62 @@ const PicksDialog = ({
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Injury/News Information */}
+            {(playerInfo.news || playerInfo.status !== 'a' || playerInfo.chanceThisRound !== null) && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    🏥 Thông tin sức khỏe
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="space-y-2 text-sm">
+                    {playerInfo.news && (
+                      <div className="p-2 bg-yellow-50 border border-yellow-200 rounded">
+                        <div className="font-medium text-yellow-800 mb-1">Tin tức:</div>
+                        <div className="text-yellow-700">{playerInfo.news}</div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 gap-2">
+                      {playerInfo.status !== 'a' && (
+                        <div className="flex justify-between items-center">
+                          <span>Trạng thái:</span>
+                          <div>
+                            {playerInfo.status === 'i' && <Badge variant="destructive" className="text-xs">🚑 Injured</Badge>}
+                            {playerInfo.status === 'd' && <Badge variant="default" className="text-xs bg-yellow-500">⚠️ Doubtful</Badge>}
+                            {playerInfo.status === 's' && <Badge variant="destructive" className="text-xs">⛔ Suspended</Badge>}
+                            {playerInfo.status === 'u' && <Badge variant="secondary" className="text-xs">❌ Unavailable</Badge>}
+                          </div>
+                        </div>
+                      )}
+
+                      {playerInfo.chanceThisRound !== null && (
+                        <div className="flex justify-between">
+                          <span>Khả năng ra sân gameweek này:</span>
+                          <span className={`font-bold ${playerInfo.chanceThisRound <= 25 ? 'text-red-600' :
+                            playerInfo.chanceThisRound <= 75 ? 'text-yellow-600' : 'text-green-600'
+                            }`}>
+                            {playerInfo.chanceThisRound}%
+                          </span>
+                        </div>
+                      )}
+
+                      {playerInfo.chanceNextRound !== null && (
+                        <div className="flex justify-between">
+                          <span>Khả năng ra sân gameweek sau:</span>
+                          <span className={`font-bold ${playerInfo.chanceNextRound <= 25 ? 'text-red-600' :
+                            playerInfo.chanceNextRound <= 75 ? 'text-yellow-600' : 'text-green-600'
+                            }`}>
+                            {playerInfo.chanceNextRound}%
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             {/* Tổng quan điểm */}
             <Card>
               <CardHeader className="pb-2">
@@ -1407,6 +1518,7 @@ export const FantasyLeaderboard = ({
   const [leagueName, setLeagueName] = useState<string>("");
   const [currentGW, setCurrentGW] = useState<number>(0);
   const [maxEntries, setMaxEntries] = useState<number | null>(null);
+  const [lastUpdatedData, setLastUpdatedData] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(pageId);
   const [currentPhase, setCurrentPhase] = useState<number>(phase);
   const [hasNextPage, setHasNextPage] = useState<boolean>(false);
@@ -1483,6 +1595,7 @@ export const FantasyLeaderboard = ({
         setCurrentGW(result.currentGW);
         setHasNextPage(result.hasNext);
         setMaxEntries(result.maxEntries);
+        setLastUpdatedData(result.lastUpdatedData);
 
         // Tính toán thống kê team chỉ khi là league của vntrip
         if (currentLeagueId === VNTRIP_LEAGUE_ID) {
@@ -2026,7 +2139,7 @@ export const FantasyLeaderboard = ({
                 </span>
               </div>
               <div>
-                Cập nhật lần cuối: {mounted ? new Date().toLocaleString('vi-VN') : 'Đang tải...'}
+                Cập nhật lần cuối: {lastUpdatedData ? new Date(lastUpdatedData).toLocaleString('vi-VN') : (mounted ? 'Chưa có dữ liệu' : 'Đang tải...')}
               </div>
             </div>
           )}
