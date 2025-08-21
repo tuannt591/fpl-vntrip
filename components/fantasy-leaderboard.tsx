@@ -1,4 +1,5 @@
 "use client";
+
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import {
@@ -16,6 +17,8 @@ import { Skeleton } from "./ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Label } from "./ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
 // Cấu trúc dữ liệu từ API Fantasy Premier League
 type APILeaderboardEntry = {
@@ -100,6 +103,13 @@ type Player = {
   status: string; // "a" = available, "d" = doubtful, "i" = injured, "u" = unavailable, "s" = suspended
   chance_of_playing_this_round: number | null;
   chance_of_playing_next_round: number | null;
+  now_cost: number;
+  selected_by_percent: string;
+  transfers_in_event: number;
+  transfers_out_event: number;
+  form: string;
+  total_points: number;
+  points_per_game: string;
 };
 
 type PlayerData = {
@@ -589,6 +599,477 @@ const globalDataCache = {
   player: null as PlayerData | null,
   playerLoaded: false,
   playerLoading: false, // Track loading state
+};
+
+// Component hiển thị thông tin theo dõi giá cầu thủ
+const PricesTab = () => {
+  const [playersData, setPlayersData] = useState<PlayerData | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedPosition, setSelectedPosition] = useState<string>('all');
+  const [selectedTeam, setSelectedTeam] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'price' | 'selected_by' | 'transfers_in' | 'transfers_out' | 'form'>('price');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [searchPlayer, setSearchPlayer] = useState<string>('');
+  const [priceRange, setPriceRange] = useState<[number, number]>([4.0, 15.0]);
+
+  // Load players data
+  useEffect(() => {
+    const loadPlayersData = async () => {
+      setIsLoading(true);
+      try {
+        // Try to get from global cache first
+        if (globalDataCache.playerLoaded && globalDataCache.player) {
+          setPlayersData(globalDataCache.player);
+        } else {
+          const data = await fetchPlayerData();
+          if (data) {
+            setPlayersData(data);
+            globalDataCache.player = data;
+            globalDataCache.playerLoaded = true;
+          }
+        }
+      } catch (error) {
+        console.error('Error loading players data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadPlayersData();
+  }, []);
+
+  // Filter and sort players
+  const filteredPlayers = useMemo(() => {
+    if (!playersData) return [];
+
+    let filtered = playersData.elements.filter(player => {
+      // Position filter
+      if (selectedPosition !== 'all') {
+        const position = playersData.element_types.find(et => et.id === player.element_type);
+        if (position?.singular_name_short !== selectedPosition) return false;
+      }
+
+      // Team filter
+      if (selectedTeam !== 'all') {
+        const team = playersData.teams.find(t => t.id === player.team);
+        if (team?.short_name !== selectedTeam) return false;
+      }
+
+      // Search filter
+      if (searchPlayer.trim()) {
+        const searchLower = searchPlayer.toLowerCase();
+        if (!player.web_name.toLowerCase().includes(searchLower) &&
+          !player.first_name.toLowerCase().includes(searchLower) &&
+          !player.second_name.toLowerCase().includes(searchLower)) {
+          return false;
+        }
+      }
+
+      // Price range filter
+      const price = player.now_cost / 10;
+      if (price < priceRange[0] || price > priceRange[1]) return false;
+
+      return true;
+    });
+
+    // Sort players
+    filtered.sort((a, b) => {
+      let aValue: number, bValue: number;
+
+      switch (sortBy) {
+        case 'price':
+          aValue = a.now_cost;
+          bValue = b.now_cost;
+          break;
+        case 'selected_by':
+          aValue = parseFloat(a.selected_by_percent);
+          bValue = parseFloat(b.selected_by_percent);
+          break;
+        case 'transfers_in':
+          aValue = a.transfers_in_event;
+          bValue = b.transfers_in_event;
+          break;
+        case 'transfers_out':
+          aValue = a.transfers_out_event;
+          bValue = b.transfers_out_event;
+          break;
+        case 'form':
+          aValue = parseFloat(a.form || '0');
+          bValue = parseFloat(b.form || '0');
+          break;
+        default:
+          aValue = a.now_cost;
+          bValue = b.now_cost;
+      }
+
+      return sortOrder === 'desc' ? bValue - aValue : aValue - bValue;
+    });
+
+    return filtered;
+  }, [playersData, selectedPosition, selectedTeam, searchPlayer, priceRange, sortBy, sortOrder]);
+
+  // Get position name
+  const getPositionName = (elementType: number) => {
+    if (!playersData) return '';
+    const position = playersData.element_types.find(et => et.id === elementType);
+    return position?.singular_name_short || '';
+  };
+
+  // Get team name
+  const getTeamName = (teamId: number) => {
+    if (!playersData) return '';
+    const team = playersData.teams.find(t => t.id === teamId);
+    return team?.short_name || '';
+  };
+
+  // Format price
+  const formatPrice = (cost: number) => {
+    return `£${(cost / 10).toFixed(1)}m`;
+  };
+
+  // Get transfer net change
+  const getTransferNet = (player: any) => {
+    return player.transfers_in_event - player.transfers_out_event;
+  };
+
+  // Get price change indicator
+  const getPriceChangeIndicator = (player: any) => {
+    // FPL API doesn't provide direct price change data
+    // We can infer potential changes from transfer activity
+    const transferNet = getTransferNet(player);
+    const selectedBy = parseFloat(player.selected_by_percent);
+
+    if (transferNet > 50000 && selectedBy > 10) {
+      return { trend: 'rising', color: 'text-green-600', icon: '📈' };
+    } else if (transferNet < -50000 && selectedBy > 5) {
+      return { trend: 'falling', color: 'text-red-600', icon: '📉' };
+    }
+    return { trend: 'stable', color: 'text-gray-600', icon: '➡️' };
+  };
+
+  // Get status color
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'a': return 'text-green-600';
+      case 'd': return 'text-yellow-600';
+      case 'i': return 'text-red-600';
+      case 's': return 'text-red-600';
+      case 'u': return 'text-gray-600';
+      default: return 'text-gray-600';
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton key={index} className="h-20" />
+          ))}
+        </div>
+        <Skeleton className="h-10 w-full" />
+        {Array.from({ length: 20 }).map((_, index) => (
+          <Skeleton key={index} className="h-16 w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  if (!playersData) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        Không thể tải dữ liệu cầu thủ
+      </div>
+    );
+  }
+
+  // Calculate statistics
+  const totalPlayers = playersData.elements.length;
+  const risingPlayers = playersData.elements.filter(p => getTransferNet(p) > 50000).length;
+  const fallingPlayers = playersData.elements.filter(p => getTransferNet(p) < -50000).length;
+  const mostTransferredIn = playersData.elements.reduce((max, player) =>
+    player.transfers_in_event > max.transfers_in_event ? player : max
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-blue-600">{totalPlayers}</div>
+            <div className="text-sm text-muted-foreground">Tổng cầu thủ</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-green-600">{risingPlayers}</div>
+            <div className="text-sm text-muted-foreground flex items-center justify-center gap-1">
+              📈 Xu hướng tăng
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-red-600">{fallingPlayers}</div>
+            <div className="text-sm text-muted-foreground flex items-center justify-center gap-1">
+              📉 Xu hướng giảm
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <div className="text-lg font-bold text-purple-600 truncate">
+              {mostTransferredIn.web_name}
+            </div>
+            <div className="text-sm text-muted-foreground">Hot nhất</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-4 space-y-4">
+          {/* Search */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <Label htmlFor="search-player">Tìm cầu thủ</Label>
+              <Input
+                id="search-player"
+                placeholder="Nhập tên cầu thủ..."
+                value={searchPlayer}
+                onChange={(e) => setSearchPlayer(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+
+            {/* Position filter */}
+            <div className="w-full sm:w-40">
+              <Label>Vị trí</Label>
+              <Select value={selectedPosition} onValueChange={setSelectedPosition}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả</SelectItem>
+                  <SelectItem value="GKP">Thủ môn</SelectItem>
+                  <SelectItem value="DEF">Hậu vệ</SelectItem>
+                  <SelectItem value="MID">Tiền vệ</SelectItem>
+                  <SelectItem value="FWD">Tiền đạo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Team filter */}
+            <div className="w-full sm:w-40">
+              <Label>Đội bóng</Label>
+              <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  <SelectItem value="all">Tất cả</SelectItem>
+                  {playersData.teams.map(team => (
+                    <SelectItem key={team.id} value={team.short_name}>
+                      {team.short_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Sort and Price Range */}
+          <div className="flex flex-col sm:flex-row gap-4 items-end">
+            <div className="w-full sm:w-40">
+              <Label>Sắp xếp theo</Label>
+              <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="price">Giá</SelectItem>
+                  <SelectItem value="selected_by">% Sở hữu</SelectItem>
+                  <SelectItem value="transfers_in">Mua vào</SelectItem>
+                  <SelectItem value="transfers_out">Bán ra</SelectItem>
+                  <SelectItem value="form">Phong độ</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="w-full sm:w-32">
+              <Label>Thứ tự</Label>
+              <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="desc">Giảm dần</SelectItem>
+                  <SelectItem value="asc">Tăng dần</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex-1">
+              <Label>Khoảng giá: £{priceRange[0]}m - £{priceRange[1]}m</Label>
+              <div className="flex gap-2 mt-1">
+                <Input
+                  type="number"
+                  min="4.0"
+                  max="15.0"
+                  step="0.1"
+                  value={priceRange[0]}
+                  onChange={(e) => setPriceRange([parseFloat(e.target.value), priceRange[1]])}
+                  className="w-20"
+                />
+                <span className="self-center">-</span>
+                <Input
+                  type="number"
+                  min="4.0"
+                  max="15.0"
+                  step="0.1"
+                  value={priceRange[1]}
+                  onChange={(e) => setPriceRange([priceRange[0], parseFloat(e.target.value)])}
+                  className="w-20"
+                />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Players Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>Danh sách cầu thủ ({filteredPlayers.length})</span>
+            <div className="text-sm text-muted-foreground">
+              Cập nhật: {new Date().toLocaleDateString('vi-VN')}
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="relative border rounded-lg">
+            <div className="overflow-x-auto w-full">
+              <Table className="relative min-w-[1000px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">#</TableHead>
+                    <TableHead className="min-w-[200px]">Cầu thủ</TableHead>
+                    <TableHead className="text-center min-w-[80px]" title="Vị trí của cầu thủ (GKP/DEF/MID/FWD)">Vị trí</TableHead>
+                    <TableHead className="text-center min-w-[80px]" title="Đội bóng hiện tại">Đội</TableHead>
+                    <TableHead className="text-center min-w-[80px]" title="Giá hiện tại của cầu thủ (£x.xm)">Giá</TableHead>
+                    <TableHead className="text-center min-w-[100px]" title="Tỷ lệ % người chơi FPL sở hữu cầu thủ này">% Sở hữu</TableHead>
+                    <TableHead className="text-center min-w-[100px]" title="Xu hướng thay đổi giá dựa trên hoạt động chuyển nhượng">Xu hướng</TableHead>
+                    <TableHead className="text-center min-w-[100px]" title="Số lượng người chơi mua cầu thủ trong gameweek hiện tại">Mua vào</TableHead>
+                    <TableHead className="text-center min-w-[100px]" title="Số lượng người chơi bán cầu thủ trong gameweek hiện tại">Bán ra</TableHead>
+                    <TableHead className="text-center min-w-[100px]" title="Điểm trung bình trong 5 gameweek gần nhất">Phong độ</TableHead>
+                    <TableHead className="text-center min-w-[120px]" title="Tình trạng sức khỏe và đình chỉ của cầu thủ">Trạng thái</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredPlayers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                        Không tìm thấy cầu thủ nào phù hợp
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredPlayers.slice(0, 100).map((player, index) => {
+                      const priceChange = getPriceChangeIndicator(player);
+                      const transferNet = getTransferNet(player);
+
+                      return (
+                        <TableRow key={player.id} className="hover:bg-muted/50">
+                          <TableCell className="font-medium">{index + 1}</TableCell>
+                          <TableCell className="min-w-[200px]">
+                            <div className="flex flex-col">
+                              <div className="font-medium">{player.web_name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {player.first_name} {player.second_name}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline" className="text-xs">
+                              {getPositionName(player.element_type)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline" className="text-xs">
+                              {getTeamName(player.team)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center font-mono font-medium">
+                            {formatPrice(player.now_cost)}
+                          </TableCell>
+                          <TableCell className="text-center font-mono">
+                            {player.selected_by_percent}%
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className={`flex items-center justify-center gap-1 ${priceChange.color}`}>
+                              <span>{priceChange.icon}</span>
+                              <span className="text-xs font-medium">{priceChange.trend}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center font-mono text-green-600">
+                            +{player.transfers_in_event.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-center font-mono text-red-600">
+                            -{player.transfers_out_event.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-center font-mono">
+                            <div className="flex items-center justify-center">
+                              <span className="font-medium">{player.form}</span>
+                              <span className="text-xs text-muted-foreground ml-1">/5GW</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {player.status === 'a' ? (
+                              <div className="flex items-center justify-center">
+                                <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                                <span className="text-xs text-green-600 font-medium">Sẵn sàng</span>
+                              </div>
+                            ) : player.status === 'd' ? (
+                              <div className="flex items-center justify-center">
+                                <div className="w-2 h-2 bg-yellow-500 rounded-full mr-1"></div>
+                                <span className="text-xs text-yellow-600 font-medium">Chưa chắc</span>
+                              </div>
+                            ) : player.status === 'i' ? (
+                              <div className="flex items-center justify-center">
+                                <div className="w-2 h-2 bg-red-500 rounded-full mr-1"></div>
+                                <span className="text-xs text-red-600 font-medium">Chấn thương</span>
+                              </div>
+                            ) : player.status === 's' ? (
+                              <div className="flex items-center justify-center">
+                                <div className="w-2 h-2 bg-red-500 rounded-full mr-1"></div>
+                                <span className="text-xs text-red-600 font-medium">Bị treo</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-center">
+                                <div className="w-2 h-2 bg-gray-500 rounded-full mr-1"></div>
+                                <span className="text-xs text-gray-600 font-medium">Không rõ</span>
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+
+          {filteredPlayers.length > 100 && (
+            <div className="p-4 text-center text-sm text-muted-foreground border-t">
+              Hiển thị 100 cầu thủ đầu tiên. Sử dụng bộ lọc để thu hẹp kết quả.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
 };
 
 // Component hiển thị lịch thi đấu
@@ -1711,7 +2192,7 @@ export const FantasyLeaderboard = ({
   const [error, setError] = useState<string | null>(null);
   const [inputLeagueId, setInputLeagueId] = useState<string>(leagueId);
   const [currentLeagueId, setCurrentLeagueId] = useState<string>(leagueId);
-  const [activeTab, setActiveTab] = useState<'leaderboard' | 'fixtures'>('leaderboard');
+  const [activeTab, setActiveTab] = useState<'leaderboard' | 'fixtures' | 'prices'>('leaderboard');
   const [searchManager, setSearchManager] = useState<string>('');
   const [allLeaderboardData, setAllLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -1969,6 +2450,15 @@ export const FantasyLeaderboard = ({
                   }`}
               >
                 📅 Lịch thi đấu
+              </button>
+              <button
+                onClick={() => setActiveTab('prices')}
+                className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap ${activeTab === 'prices'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  }`}
+              >
+                💰 Theo dõi giá
               </button>
             </div>
           </div>
@@ -2314,6 +2804,7 @@ export const FantasyLeaderboard = ({
           )}
 
           {activeTab === 'fixtures' && <FixturesTab />}
+          {activeTab === 'prices' && <PricesTab />}
 
           {!isLoading && (
             <div className="mt-4 flex justify-between items-center text-sm text-muted-foreground">
