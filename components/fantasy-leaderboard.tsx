@@ -572,11 +572,12 @@ const TEAMS: TeamConfig[] = [
   }
 ];
 
-// Hàm tính toán thống kê team
+// Hàm tính toán thống kê team theo điểm GW hiện tại
 const calculateTeamStats = (entries: LeaderboardEntry[]): TeamStats[] => {
   return TEAMS.map(team => {
     const teamMembers = entries.filter(entry => team.entries.includes(entry.entry));
-    const totalPoints = teamMembers.reduce((sum, member) => sum + member.total, 0);
+    // Tính tổng điểm GW hiện tại
+    const totalPoints = teamMembers.reduce((sum, member) => sum + member.gw, 0);
     const averagePoints = teamMembers.length > 0 ? Math.round(totalPoints / teamMembers.length) : 0;
     const bestRank = teamMembers.length > 0 ? Math.min(...teamMembers.map(member => member.rank)) : 0;
 
@@ -1406,75 +1407,198 @@ const FixturesTab = () => {
             Không có trận đấu nào
           </div>
         ) : (
-          filteredFixtures.map((fixture) => (
-            <Card
-              key={fixture.id}
-              className={`${fixture.started && !fixture.finished ? 'border-green-500 shadow-lg' : ''}`}
-            >
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
-                  {/* Match Info */}
-                  <div className="flex items-center justify-center space-x-2 sm:space-x-4">
-                    <div className="text-center min-w-[60px] sm:min-w-[80px]">
-                      <div className="font-semibold text-sm sm:text-base">{getTeamName(fixture.team_h)}</div>
-                      <div className="text-xs text-muted-foreground hidden sm:block">Home</div>
-                    </div>
+          filteredFixtures.map((fixture) => {
+            // Helper: lấy tên cầu thủ từ id
+            const getPlayerName = (id: number) => {
+              if (!playerData) return `#${id}`;
+              const p = playerData.elements.find(e => e.id === id);
+              return p ? p.web_name : `#${id}`;
+            };
 
-                    <div className="text-center px-2 sm:px-4">
-                      <div>
-                        <div className="text-lg font-bold">
-                          {getScoreDisplay(fixture)}
+            // Helper: render danh sách sự kiện theo đội
+            const renderEventList = (identifier: string, label: string, color: string) => {
+              if (!fixture.stats) return null;
+              const stat = fixture.stats.find(s => s.identifier === identifier);
+              if (!stat) return null;
+              return (
+                <>
+                  {stat.h.length > 0 && (
+                    <div className="text-xs" style={{ color }}>
+                      <b>{label} (Home):</b> {stat.h.map(ev => getPlayerName(ev.element)).join(', ')}
+                    </div>
+                  )}
+                  {stat.a.length > 0 && (
+                    <div className="text-xs" style={{ color }}>
+                      <b>{label} (Away):</b> {stat.a.map(ev => getPlayerName(ev.element)).join(', ')}
+                    </div>
+                  )}
+                </>
+              );
+            };
+
+            return (
+              <Card
+                key={fixture.id}
+                className={`${fixture.started && !fixture.finished ? 'border-green-500 shadow-lg' : ''}`}
+              >
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
+                    {/* Match Info */}
+                    <div className="flex items-center justify-center space-x-2 sm:space-x-4">
+                      <div className="text-center min-w-[60px] sm:min-w-[80px]">
+                        <div className="font-semibold text-sm sm:text-base">{getTeamName(fixture.team_h)}</div>
+                        <div className="text-xs text-muted-foreground hidden sm:block">Home</div>
+                      </div>
+
+                      <div className="text-center px-2 sm:px-4">
+                        <div>
+                          <div className="text-lg font-bold">
+                            {getScoreDisplay(fixture)}
+                          </div>
+                          <div className="text-xs sm:text-sm text-muted-foreground">
+                            {fixture.started && !fixture.finished ? (
+                              <span className="flex items-center justify-center gap-1">
+                                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                                {getFixtureStatus(fixture)}
+                              </span>
+                            ) : fixture.started ? (
+                              getFixtureStatus(fixture)
+                            ) : (
+                              formatDate(fixture.kickoff_time)
+                            )}
+                          </div>
                         </div>
-                        <div className="text-xs sm:text-sm text-muted-foreground">
-                          {fixture.started && !fixture.finished ? (
-                            <span className="flex items-center justify-center gap-1">
-                              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-                              {getFixtureStatus(fixture)}
-                            </span>
-                          ) : fixture.started ? (
-                            getFixtureStatus(fixture)
-                          ) : (
-                            formatDate(fixture.kickoff_time)
-                          )}
-                        </div>
+                      </div>
+
+                      <div className="text-center min-w-[60px] sm:min-w-[80px]">
+                        <div className="font-semibold text-sm sm:text-base">{getTeamName(fixture.team_a)}</div>
+                        <div className="text-xs text-muted-foreground hidden sm:block">Away</div>
                       </div>
                     </div>
 
-                    <div className="text-center min-w-[60px] sm:min-w-[80px]">
-                      <div className="font-semibold text-sm sm:text-base">{getTeamName(fixture.team_a)}</div>
-                      <div className="text-xs text-muted-foreground hidden sm:block">Away</div>
+                    {/* Match Status */}
+                    <div className="flex items-center justify-center sm:justify-end flex-wrap gap-2">
+                      <Badge variant="outline" className="text-xs">
+                        GW {fixture.event}
+                      </Badge>
+
+                      <Badge
+                        className={`text-xs ${getStatusBadgeStyle(fixture)}`}
+                      >
+                        {fixture.finished ? (
+                          'FT'
+                        ) : fixture.started ? (
+                          <>
+                            <span className="w-2 h-2 bg-white rounded-full animate-pulse mr-1"></span>
+                            LIVE
+                          </>
+                        ) : (
+                          'Scheduled'
+                        )}
+                      </Badge>
+
                     </div>
                   </div>
 
-                  {/* Match Status */}
-                  <div className="flex items-center justify-center sm:justify-end flex-wrap gap-2">
-                    <Badge variant="outline" className="text-xs">
-                      GW {fixture.event}
-                    </Badge>
-
-                    <Badge
-                      className={`text-xs ${getStatusBadgeStyle(fixture)}`}
-                    >
-                      {fixture.finished ? (
-                        'FT'
-                      ) : fixture.started ? (
-                        <>
-                          <span className="w-2 h-2 bg-white rounded-full animate-pulse mr-1"></span>
-                          LIVE
-                        </>
-                      ) : (
-                        'Scheduled'
-                      )}
-                    </Badge>
-
-                    <div className="text-xs text-muted-foreground hidden sm:block">
-                      Difficulty: {fixture.team_h_difficulty} - {fixture.team_a_difficulty}
+                  {/* Chi tiết sự kiện trận đấu (ngắn gọn) */}
+                  {fixture.stats && fixture.started && (
+                    <div className="mt-2 px-2 py-1 bg-muted/40 rounded border text-xs">
+                      <div className="grid grid-cols-2 gap-x-4">
+                        {/* Home side */}
+                        <div>
+                          <div className="font-semibold text-green-700 mb-0.5">{getTeamName(fixture.team_h)}</div>
+                          {/* Ghi bàn */}
+                          {(() => {
+                            const stat = fixture.stats.find(s => s.identifier === 'goals_scored');
+                            if (!stat || stat.h.length === 0) return null;
+                            return (
+                              <div className="flex items-center gap-1 text-green-700 mb-0.5">
+                                <b>⚽</b> {stat.h.map(ev => getPlayerName(ev.element)).join(', ')}
+                              </div>
+                            );
+                          })()}
+                          {/* Kiến tạo */}
+                          {(() => {
+                            const stat = fixture.stats.find(s => s.identifier === 'assists');
+                            if (!stat || stat.h.length === 0) return null;
+                            return (
+                              <div className="flex items-center gap-1 text-blue-700 mb-0.5">
+                                <b>🅰️</b> {stat.h.map(ev => getPlayerName(ev.element)).join(', ')}
+                              </div>
+                            );
+                          })()}
+                          {/* Thẻ vàng */}
+                          {(() => {
+                            const stat = fixture.stats.find(s => s.identifier === 'yellow_cards');
+                            if (!stat || stat.h.length === 0) return null;
+                            return (
+                              <div className="flex items-center gap-1 text-yellow-700 mb-0.5">
+                                <b>🟨</b> {stat.h.map(ev => getPlayerName(ev.element)).join(', ')}
+                              </div>
+                            );
+                          })()}
+                          {/* Thẻ đỏ */}
+                          {(() => {
+                            const stat = fixture.stats.find(s => s.identifier === 'red_cards');
+                            if (!stat || stat.h.length === 0) return null;
+                            return (
+                              <div className="flex items-center gap-1 text-red-700 mb-0.5">
+                                <b>🟥</b> {stat.h.map(ev => getPlayerName(ev.element)).join(', ')}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                        {/* Away side */}
+                        <div>
+                          <div className="font-semibold text-green-700 mb-0.5">{getTeamName(fixture.team_a)}</div>
+                          {/* Ghi bàn */}
+                          {(() => {
+                            const stat = fixture.stats.find(s => s.identifier === 'goals_scored');
+                            if (!stat || stat.a.length === 0) return null;
+                            return (
+                              <div className="flex items-center gap-1 text-green-700 mb-0.5">
+                                <b>⚽</b> {stat.a.map(ev => getPlayerName(ev.element)).join(', ')}
+                              </div>
+                            );
+                          })()}
+                          {/* Kiến tạo */}
+                          {(() => {
+                            const stat = fixture.stats.find(s => s.identifier === 'assists');
+                            if (!stat || stat.a.length === 0) return null;
+                            return (
+                              <div className="flex items-center gap-1 text-blue-700 mb-0.5">
+                                <b>🅰️</b> {stat.a.map(ev => getPlayerName(ev.element)).join(', ')}
+                              </div>
+                            );
+                          })()}
+                          {/* Thẻ vàng */}
+                          {(() => {
+                            const stat = fixture.stats.find(s => s.identifier === 'yellow_cards');
+                            if (!stat || stat.a.length === 0) return null;
+                            return (
+                              <div className="flex items-center gap-1 text-yellow-700 mb-0.5">
+                                <b>🟨</b> {stat.a.map(ev => getPlayerName(ev.element)).join(', ')}
+                              </div>
+                            );
+                          })()}
+                          {/* Thẻ đỏ */}
+                          {(() => {
+                            const stat = fixture.stats.find(s => s.identifier === 'red_cards');
+                            if (!stat || stat.a.length === 0) return null;
+                            return (
+                              <div className="flex items-center gap-1 text-red-700 mb-0.5">
+                                <b>🟥</b> {stat.a.map(ev => getPlayerName(ev.element)).join(', ')}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })
         )}
       </div>
 
@@ -1705,19 +1829,19 @@ const PicksDialog = ({
           <div className={`bg-gradient-to-b from-green-600 to-green-700 text-white rounded-lg shadow-lg border-[1px] border-white relative cursor-pointer hover:from-green-700 hover:to-green-800 transition-all transform hover:scale-105`}>
             {/* Captain/Vice-Captain indicators - only for starting eleven */}
             {pick.position <= 11 && pick.is_captain && (
-              <div className="absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 w-4 h-4 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center text-[10px] font-medium border-[1px] border-white">
+              <div className="absolute -bottom-1.5 -right-1.5 sm:-bottom-2 sm:-right-2 w-4 h-4 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center text-[10px] font-medium border-[1px] border-white">
                 C
               </div>
             )}
             {pick.position <= 11 && pick.is_vice_captain && (
-              <div className="absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 w-4 h-4 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full flex items-center justify-center text-[10px] font-medium border-[1px] border-white">
+              <div className="absolute -bottom-1.5 -right-1.5 sm:-bottom-2 sm:-right-2 w-4 h-4 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full flex items-center justify-center text-[10px] font-medium border-[1px] border-white">
                 V
               </div>
             )}
 
             {/* Injury status indicator - only show red/yellow warnings */}
             {getInjuryStatusIndicator(playerInfo.status, playerInfo.chanceThisRound, playerInfo.chanceNextRound, playerInfo.news) && (
-              <div className="absolute -top-1 -left-1 sm:-top-1.5 sm:-left-1.5">
+              <div className="absolute -bottom-1.5 -left-1.5 sm:-bottom-2 sm:-left-2">
                 {getInjuryStatusIndicator(playerInfo.status, playerInfo.chanceThisRound, playerInfo.chanceNextRound, playerInfo.news)}
               </div>
             )}
@@ -2532,7 +2656,7 @@ export const FantasyLeaderboard = ({
               {/* Team Stats Section - chỉ hiển thị cho league vntrip */}
               {!isLoading && teamStats.length > 0 && currentLeagueId === VNTRIP_LEAGUE_ID && (
                 <div className="mb-6">
-                  <h3 className="text-lg font-semibold mb-4">Thống kê theo Team Vntrip</h3>
+                  <h3 className="text-lg font-semibold mb-4">Thống kê điểm GW hiện tại theo Team Vntrip</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     {teamStats.map((team, index) => (
                       <Card key={team.name} className="border-l-4" style={{ borderLeftColor: team.color.replace('bg-', '#') }}>
@@ -2546,9 +2670,9 @@ export const FantasyLeaderboard = ({
                         </CardHeader>
                         <CardContent className="pt-0">
                           <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Tổng điểm:</span>
-                              <span className="font-mono">{team.totalPoints.toLocaleString()}</span>
+                            <div className="flex justify-between items-end">
+                              <span className="text-muted-foreground">Tổng điểm GW hiện tại:</span>
+                              <span className="font-mono text-2xl font-extrabold text-green-700">{team.totalPoints.toLocaleString()}</span>
                             </div>
                           </div>
 
@@ -2560,7 +2684,7 @@ export const FantasyLeaderboard = ({
                                   <span className="truncate flex-1">{member.manager}</span>
                                   <div className="flex items-center gap-2">
                                     <Badge variant="outline" className="text-xs">#{member.rank}</Badge>
-                                    <span className="font-mono">{member.total.toLocaleString()}</span>
+                                    <span className="font-mono">{member.gw.toLocaleString()}</span>
                                   </div>
                                 </div>
                               ))}
@@ -2687,8 +2811,7 @@ export const FantasyLeaderboard = ({
                     <TableRow>
                       <TableHead className="w-[60px] sm:w-[80px]">Rank</TableHead>
                       <TableHead className="min-w-[120px]">Manager</TableHead>
-                      <TableHead className="min-w-[120px] hidden sm:table-cell">Team Name</TableHead>
-                      <TableHead className="text-center min-w-[80px]">GW</TableHead>
+                      <TableHead className="text-center min-w-[80px]">GW {currentGW}</TableHead>
                       <TableHead className="text-center min-w-[80px]">Total</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -2731,22 +2854,17 @@ export const FantasyLeaderboard = ({
                               {getRankBadge(entry.rank)}
                             </TableCell>
                             <TableCell>
-                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                                <div className="min-w-0">
-                                  <PicksDialog
-                                    teamId={entry.entry}
-                                    eventId={currentGW}
-                                    managerName={entry.manager}
-                                    teamName={entry.teamName}
-                                  />
-                                  <div className="text-xs text-muted-foreground sm:hidden truncate">
-                                    {entry.teamName}
-                                  </div>
+                              <div className="flex flex-col min-w-0">
+                                <PicksDialog
+                                  teamId={entry.entry}
+                                  eventId={currentGW}
+                                  managerName={entry.manager}
+                                  teamName={entry.teamName}
+                                />
+                                <div className="text-xs text-muted-foreground truncate">
+                                  {entry.teamName}
                                 </div>
                               </div>
-                            </TableCell>
-                            <TableCell className="hidden sm:table-cell">
-                              <div className="text-sm text-muted-foreground">{entry.teamName}</div>
                             </TableCell>
                             <TableCell className="text-center">
                               <Badge variant="secondary" className="font-mono text-xs">
