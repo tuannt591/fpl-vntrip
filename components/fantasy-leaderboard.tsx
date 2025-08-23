@@ -1266,9 +1266,15 @@ const FixturesTab = () => {
   };
 
 
+
+  // Trận live chỉ khi started, chưa finished và minutes < 90
+  const isLiveMatch = (fixture: Fixture) => {
+    return fixture.started && !fixture.finished && fixture.minutes < 90;
+  };
+
   const getFixtureStatus = (fixture: Fixture) => {
-    if (fixture.finished) return 'FT';
-    if (fixture.started) return `${fixture.minutes}'`;
+    if (fixture.finished || fixture.minutes >= 90) return 'FT';
+    if (isLiveMatch(fixture)) return `${fixture.minutes}'`;
 
     const kickoffTime = new Date(fixture.kickoff_time);
     const now = new Date();
@@ -1282,10 +1288,10 @@ const FixturesTab = () => {
 
   // Get live status badge style
   const getStatusBadgeStyle = (fixture: Fixture) => {
-    if (fixture.finished) {
+    if (fixture.finished || fixture.minutes >= 90) {
       return "bg-gray-500 text-white";
     }
-    if (fixture.started && !fixture.finished) {
+    if (isLiveMatch(fixture)) {
       return "bg-red-500 text-white animate-pulse"; // Live match - pulsing red
     }
     return "bg-blue-500 text-white"; // Scheduled
@@ -2698,112 +2704,114 @@ export const FantasyLeaderboard = ({
               )}
 
               {/* Search Manager Section */}
-              <div className="mb-4">
-                <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-                  <label className="text-sm font-medium whitespace-nowrap">
-                    Tìm kiếm Manager/Team:
-                  </label>
-                  <div className="flex flex-1 gap-2">
-                    <Input
-                      type="text"
-                      placeholder="Nhập tên manager hoặc tên team..."
-                      value={searchManager}
-                      onChange={(e) => setSearchManager(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          handleSearch(searchManager);
-                        }
-                      }}
-                      className="flex-1 sm:max-w-xs"
-                      disabled={isLoading || isSearching}
-                    />
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => handleSearch(searchManager)}
-                      disabled={isLoading || isSearching || !searchManager.trim()}
-                      className="whitespace-nowrap"
-                    >
-                      {isSearching ? (
-                        <>
-                          <span className="animate-spin mr-1">⏳</span>
-                          Đang tìm...
-                        </>
-                      ) : (
-                        <>
-                          🔍 Tìm kiếm
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                  {searchManager && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleClearSearch}
-                      className="w-full sm:w-auto"
-                      disabled={isSearching}
-                    >
-                      Xóa
-                    </Button>
-                  )}
-                  {isSearching && (
-                    <div className="text-xs text-blue-600 whitespace-nowrap flex items-center gap-2 flex-wrap">
-                      <span className="flex items-center gap-1">
-                        <span className="animate-spin">⏳</span>
-                        Đang tải toàn bộ league...
-                      </span>
-                      {searchProgress && (
-                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-mono">
-                          {searchProgress.loaded}/{searchProgress.total} trang
-                          {searchProgress.found !== undefined && (
-                            <span className="ml-1 text-green-600">
-                              • {searchProgress.found} kết quả
-                            </span>
-                          )}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Search Tips */}
-                <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                  💡 <span>Có thể tìm kiếm theo tên manager (ví dụ: &quot;John&quot;) hoặc tên team (ví dụ: &quot;Arsenal FC&quot;)</span>
-                </div>
-
-                {searchManager && (
-                  <p className="text-xs text-muted-foreground mt-2 bg-muted/30 p-2 rounded">
-                    {isSearching ? (
-                      <span className="text-blue-600 flex items-center gap-1">
-                        <span className="animate-spin">⏳</span>
-                        Đang tìm kiếm thông minh...
-                      </span>
-                    ) : smartSearchEnabled && searchResults.length > 0 ? (
-                      <span className="text-green-600">
-                        {foundExactMatch ? (
+              {currentLeagueId !== VNTRIP_LEAGUE_ID && (
+                <div className="mb-4">
+                  <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                    <label className="text-sm font-medium whitespace-nowrap">
+                      Tìm kiếm Manager/Team:
+                    </label>
+                    <div className="flex flex-1 gap-2">
+                      <Input
+                        type="text"
+                        placeholder="Nhập tên manager hoặc tên team..."
+                        value={searchManager}
+                        onChange={(e) => setSearchManager(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            handleSearch(searchManager);
+                          }
+                        }}
+                        className="flex-1 sm:max-w-xs"
+                        disabled={isLoading || isSearching}
+                      />
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleSearch(searchManager)}
+                        disabled={isLoading || isSearching || !searchManager.trim()}
+                        className="whitespace-nowrap"
+                      >
+                        {isSearching ? (
                           <>
-                            🎯 <strong>Tìm thấy kết quả chính xác!</strong> Hiển thị {filteredLeaderboardData.length} kết quả
+                            <span className="animate-spin mr-1">⏳</span>
+                            Đang tìm...
                           </>
                         ) : (
                           <>
-                            🔍 Search thông minh: <strong>{filteredLeaderboardData.length}</strong> kết quả tìm thấy
-                            <br />
-                            <span className="text-xs mt-1 block">💡 Có thể tìm theo tên manager hoặc tên team</span>
+                            🔍 Tìm kiếm
                           </>
                         )}
-                      </span>
-                    ) : (
-                      <span className="text-orange-600">
-                        📄 Tìm kiếm trang hiện tại: <strong>{filteredLeaderboardData.length}</strong> / {leaderboardData.length} kết quả
-                        <span className="block text-xs mt-1">
-                          💡 Nhấn nút &quot;🔍 Tìm kiếm&quot; để search thông minh
-                        </span>
-                      </span>
+                      </Button>
+                    </div>
+                    {searchManager && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleClearSearch}
+                        className="w-full sm:w-auto"
+                        disabled={isSearching}
+                      >
+                        Xóa
+                      </Button>
                     )}
-                  </p>
-                )}
-              </div>
+                    {isSearching && (
+                      <div className="text-xs text-blue-600 whitespace-nowrap flex items-center gap-2 flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <span className="animate-spin">⏳</span>
+                          Đang tải toàn bộ league...
+                        </span>
+                        {searchProgress && (
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-mono">
+                            {searchProgress.loaded}/{searchProgress.total} trang
+                            {searchProgress.found !== undefined && (
+                              <span className="ml-1 text-green-600">
+                                • {searchProgress.found} kết quả
+                              </span>
+                            )}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Search Tips */}
+                  <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                    💡 <span>Có thể tìm kiếm theo tên manager (ví dụ: &quot;John&quot;) hoặc tên team (ví dụ: &quot;Arsenal FC&quot;)</span>
+                  </div>
+
+                  {searchManager && (
+                    <p className="text-xs text-muted-foreground mt-2 bg-muted/30 p-2 rounded">
+                      {isSearching ? (
+                        <span className="text-blue-600 flex items-center gap-1">
+                          <span className="animate-spin">⏳</span>
+                          Đang tìm kiếm thông minh...
+                        </span>
+                      ) : smartSearchEnabled && searchResults.length > 0 ? (
+                        <span className="text-green-600">
+                          {foundExactMatch ? (
+                            <>
+                              🎯 <strong>Tìm thấy kết quả chính xác!</strong> Hiển thị {filteredLeaderboardData.length} kết quả
+                            </>
+                          ) : (
+                            <>
+                              🔍 Search thông minh: <strong>{filteredLeaderboardData.length}</strong> kết quả tìm thấy
+                              <br />
+                              <span className="text-xs mt-1 block">💡 Có thể tìm theo tên manager hoặc tên team</span>
+                            </>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-orange-600">
+                          📄 Tìm kiếm trang hiện tại: <strong>{filteredLeaderboardData.length}</strong> / {leaderboardData.length} kết quả
+                          <span className="block text-xs mt-1">
+                            💡 Nhấn nút &quot;🔍 Tìm kiếm&quot; để search thông minh
+                          </span>
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="rounded-md border overflow-x-auto">
                 <Table>
