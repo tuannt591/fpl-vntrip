@@ -7,6 +7,13 @@ import { ThemeProvider } from "@/components/layout/theme-provider";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    minimumScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+  },
   title: "Fantasy Premier League Leaderboard - FPL Vntrip",
   description: "View and track Fantasy Premier League leaderboards with detailed team statistics and player information. Real-time points, team formations, and live scoring data.",
   keywords: ["Fantasy Premier League", "FPL", "leaderboard", "football", "soccer", "vntrip"],
