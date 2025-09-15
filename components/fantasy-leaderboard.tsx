@@ -14,7 +14,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "./ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 
@@ -90,10 +89,6 @@ type Pick = {
   is_vice_captain: boolean;
 };
 
-
-
-
-
 type PicksData = {
   active_chip: string | null;
   automatic_subs: any[];
@@ -145,7 +140,37 @@ type LiveData = {
   elements: LivePlayerData[];
 };
 
+type BootstrapPlayer = {
+  id: number;
+  web_name: string;
+  first_name: string;
+  second_name: string;
+  element_type: number;
+  team: number;
+  status: string;
+  chance_of_playing_this_round: number | null;
+  chance_of_playing_next_round: number | null;
+  news: string;
+};
 
+type BootstrapTeam = {
+  id: number;
+  name: string;
+  short_name: string;
+};
+
+type BootstrapElementType = {
+  id: number;
+  plural_name: string;
+  singular_name: string;
+  singular_name_short: string;
+};
+
+type BootstrapData = {
+  elements: BootstrapPlayer[];
+  teams: BootstrapTeam[];
+  element_types: BootstrapElementType[];
+};
 
 interface FantasyLeaderboardProps {
   leagueId?: string;
@@ -155,6 +180,28 @@ interface FantasyLeaderboardProps {
 
 // Constants
 const VNTRIP_LEAGUE_ID = "1405297";
+
+// Hàm để fetch dữ liệu bootstrap (thông tin cầu thủ)
+const fetchBootstrapData = async (): Promise<BootstrapData | null> => {
+  try {
+    const response = await fetch('/api/fantasy-bootstrap', {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data: BootstrapData = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching bootstrap data:', error);
+    return null;
+  }
+};
 
 // Hàm để fetch dữ liệu live (điểm cầu thủ)
 const fetchLiveData = async (eventId: number): Promise<LiveData | null> => {
@@ -181,10 +228,6 @@ const fetchLiveData = async (eventId: number): Promise<LiveData | null> => {
     return null;
   }
 };
-
-
-
-
 
 // Hàm để fetch dữ liệu picks
 const fetchPicksData = async (teamId: number, eventId: number): Promise<PicksData | null> => {
@@ -213,7 +256,114 @@ const fetchPicksData = async (teamId: number, eventId: number): Promise<PicksDat
   }
 };
 
+// Hàm để fetch picks data cho nhiều team cùng lúc với delay để tránh rate limit
+const fetchAllPicksData = async (entries: LeaderboardEntry[], eventId: number): Promise<Map<number, PicksData>> => {
+  const picksMap = new Map<number, PicksData>();
 
+  // Chỉ lấy picks của top 20 managers để tránh quá tải API
+  const topEntries = entries.slice(0, 20);
+
+  for (let i = 0; i < topEntries.length; i++) {
+    const entry = topEntries[i];
+
+    try {
+      // Thêm delay giữa các request để tránh rate limit
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 200)); // 200ms delay
+      }
+
+      const picksData = await fetchPicksData(entry.entry, eventId);
+      if (picksData) {
+        picksMap.set(entry.entry, picksData);
+      }
+    } catch (error) {
+      console.error(`Error fetching picks for team ${entry.entry}:`, error);
+      // Continue với team khác nếu có lỗi
+    }
+  }
+
+  return picksMap;
+};
+
+// Fetch all leaderboard data (no pagination)
+const fetchAllLeaderboardData = async (
+  leagueId: string,
+  phase: number = 1
+): Promise<{ entries: LeaderboardEntry[], leagueName: string, currentGW: number, maxEntries: number | null, lastUpdatedData: string }> => {
+  try {
+    let allEntries: LeaderboardEntry[] = [];
+    let currentPage = 1;
+    let hasNext = true;
+    let leagueInfo: any = null;
+
+    // Fetch all pages
+    while (hasNext) {
+      const params = new URLSearchParams({
+        leagueId: leagueId,
+        pageId: currentPage.toString(),
+        phase: phase.toString(),
+      });
+
+      const response = await fetch(`/api/fantasy-leaderboard?${params}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data: APIResponse = await response.json();
+
+      // Save league info from first page
+      if (currentPage === 1) {
+        leagueInfo = data;
+      }
+
+      // Add entries from current page
+      const pageEntries = data.standings.results.map((entry) => ({
+        rank: entry.rank,
+        manager: entry.player_name,
+        teamName: entry.entry_name,
+        gw: entry.event_total,
+        total: entry.total,
+        entry: entry.entry,
+      }));
+
+      allEntries = [...allEntries, ...pageEntries];
+      hasNext = data.standings.has_next;
+      currentPage++;
+
+      // Safety check to prevent infinite loop
+      if (currentPage > 100) {
+        console.warn('Reached maximum page limit (100) when fetching leaderboard');
+        break;
+      }
+    }
+
+    return {
+      entries: allEntries,
+      leagueName: leagueInfo?.league.name || "Unknown League",
+      currentGW: leagueInfo?.current_event || Math.max(...allEntries.map(entry => entry.gw)),
+      maxEntries: leagueInfo?.league.max_entries || null,
+      lastUpdatedData: leagueInfo?.last_updated_data || ""
+    };
+  } catch (error) {
+    console.error('Error fetching all leaderboard data:', error);
+    // Return empty data if API fails
+    return {
+      entries: [],
+      leagueName: "Không thể tải dữ liệu league",
+      currentGW: 0,
+      maxEntries: null,
+      lastUpdatedData: ""
+    };
+  }
+};
+
+// Keep the original function for backward compatibility
 const fetchLeaderboardData = async (
   leagueId: string,
   pageId: number = 1,
@@ -323,56 +473,91 @@ const PicksDialog = ({
   teamId,
   eventId,
   managerName,
-  teamName
+  teamName,
+  globalBootstrapData,
+  globalLiveData,
+  cachedPicksData
 }: {
   teamId: number;
   eventId: number;
   managerName: string;
   teamName: string;
+  globalBootstrapData: BootstrapData | null;
+  globalLiveData: LiveData | null;
+  cachedPicksData: PicksData | null;
 }) => {
   const [picksData, setPicksData] = useState<PicksData | null>(null);
-
-  const [liveData, setLiveData] = useState<LiveData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const handleOpen = async () => {
     setIsDialogOpen(true);
-    setIsLoading(true);
 
-    try {
-      // Fetch picks and live data only
-      const [picks, live] = await Promise.all([
-        fetchPicksData(teamId, eventId),
-        fetchLiveData(eventId)
-      ]);
-
-      setPicksData(picks);
-      setLiveData(live);
-    } catch (error) {
-      console.error('Error loading data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }; const handleDialogClose = (open: boolean) => {
-    setIsDialogOpen(open);
-    if (!open) {
-      // Clear data when closing dialog
-      setPicksData(null);
-      setLiveData(null);
+    // Sử dụng cached data nếu có, nếu không thì fetch từ API
+    if (cachedPicksData) {
+      setPicksData(cachedPicksData);
+    } else {
+      setIsLoading(true);
+      try {
+        console.log(`🔄 Fetching picks data for team ${teamId} (not in cache)`);
+        const picks = await fetchPicksData(teamId, eventId);
+        setPicksData(picks);
+      } catch (error) {
+        console.error('Error loading picks data:', error);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
-  // Helper function to get player info - simplified without detailed data
+  const handleDialogClose = (open: boolean) => {
+    setIsDialogOpen(open);
+    if (!open) {
+      // Clear data when closing dialog nếu không phải cached data
+      if (!cachedPicksData) {
+        setPicksData(null);
+      }
+    }
+  };
+
+  // Helper function to get player info with real data
   const getPlayerInfo = (elementId: number) => {
+    if (!globalBootstrapData) {
+      return {
+        name: `Cầu thủ #${elementId}`,
+        position: '',
+        team: '',
+        news: '',
+        status: 'a',
+        chanceThisRound: null,
+        chanceNextRound: null
+      };
+    }
+
+    const player = globalBootstrapData.elements.find((p: BootstrapPlayer) => p.id === elementId);
+    if (!player) {
+      return {
+        name: `Cầu thủ #${elementId}`,
+        position: '',
+        team: '',
+        news: '',
+        status: 'a',
+        chanceThisRound: null,
+        chanceNextRound: null
+      };
+    }
+
+    const team = globalBootstrapData.teams.find((t: BootstrapTeam) => t.id === player.team);
+    const position = globalBootstrapData.element_types.find((et: BootstrapElementType) => et.id === player.element_type);
+
     return {
-      name: `Cầu thủ #${elementId}`,
-      position: '',
-      team: '',
-      news: '',
-      status: 'a',
-      chanceThisRound: null,
-      chanceNextRound: null
+      name: player.web_name,
+      position: position?.singular_name_short || '',
+      team: team?.short_name || '',
+      news: player.news || '',
+      status: player.status || 'a',
+      chanceThisRound: player.chance_of_playing_this_round,
+      chanceNextRound: player.chance_of_playing_next_round
     };
   };
 
@@ -415,8 +600,8 @@ const PicksDialog = ({
     return null;
   };  // Helper function to get player points
   const getPlayerPoints = (elementId: number) => {
-    if (!liveData) return 0;
-    const livePlayer = liveData.elements.find(p => p.id === elementId);
+    if (!globalLiveData) return 0;
+    const livePlayer = globalLiveData.elements.find((p: LivePlayerData) => p.id === elementId);
     return livePlayer?.stats?.total_points || 0;
   };
 
@@ -452,14 +637,14 @@ const PicksDialog = ({
 
     // Get detailed player data from live data
     const getPlayerDetailStats = () => {
-      if (!liveData) return null;
-      const livePlayer = liveData.elements.find(p => p.id === pick.element);
+      if (!globalLiveData) return null;
+      const livePlayer = globalLiveData.elements.find((p: LivePlayerData) => p.id === pick.element);
       return livePlayer?.stats || null;
     };
 
     const getPlayerExplain = () => {
-      if (!liveData) return [];
-      const livePlayer = liveData.elements.find(p => p.id === pick.element);
+      if (!globalLiveData) return [];
+      const livePlayer = globalLiveData.elements.find((p: LivePlayerData) => p.id === pick.element);
       return livePlayer?.explain || [];
     };
 
@@ -659,11 +844,11 @@ const PicksDialog = ({
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="space-y-2">
-                    {playerExplain.map((fixture, index) => (
+                    {playerExplain.map((fixture: any, index: number) => (
                       <div key={index} className="border rounded p-2">
                         <div className="font-medium text-sm mb-1">Trận đấu #{fixture.fixture}</div>
                         <div className="space-y-1">
-                          {fixture.stats.map((stat, statIndex) => (
+                          {fixture.stats.map((stat: any, statIndex: number) => (
                             <div key={statIndex} className="flex justify-between text-xs">
                               <span className="capitalize">
                                 {stat.identifier.replace(/_/g, ' ')}:
@@ -990,31 +1175,42 @@ export const FantasyLeaderboard = ({
   const [currentGW, setCurrentGW] = useState<number>(0);
   const [maxEntries, setMaxEntries] = useState<number | null>(null);
   const [lastUpdatedData, setLastUpdatedData] = useState<string>("");
-  const [currentPage, setCurrentPage] = useState<number>(pageId);
   const [currentPhase, setCurrentPhase] = useState<number>(phase);
-  const [hasNextPage, setHasNextPage] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const currentLeagueId = VNTRIP_LEAGUE_ID;
 
+  // Global data states - loaded once when component mounts
+  const [bootstrapData, setBootstrapData] = useState<BootstrapData | null>(null);
+  const [liveData, setLiveData] = useState<LiveData | null>(null);
+  const [isGlobalDataLoading, setIsGlobalDataLoading] = useState(false);
+
+  // Picks data cache - loaded when page loads
+  const [allPicksData, setAllPicksData] = useState<Map<number, PicksData>>(new Map());
+  const [isPicksDataLoading, setIsPicksDataLoading] = useState(false);
+
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Fetch dữ liệu khi component mount hoặc khi thông số thay đổi
+  // Load all data once when component mounts
   useEffect(() => {
-    const loadLeaderboardData = async () => {
+    const loadAllData = async () => {
+      if (!mounted) return;
+
       setIsLoading(true);
+      setIsGlobalDataLoading(true);
+      setIsPicksDataLoading(true);
       setError(null);
 
       try {
-        const result = await fetchLeaderboardData(currentLeagueId, currentPage, currentPhase);
+        // Fetch all leaderboard data (no pagination)
+        const result = await fetchAllLeaderboardData(currentLeagueId, currentPhase);
 
         setLeaderboardData(result.entries);
         setLeagueName(result.leagueName);
         setCurrentGW(result.currentGW);
-        setHasNextPage(result.hasNext);
         setMaxEntries(result.maxEntries);
         setLastUpdatedData(result.lastUpdatedData);
 
@@ -1025,6 +1221,23 @@ export const FantasyLeaderboard = ({
         } else {
           setTeamStats([]);
         }
+
+        // Then fetch global data if we have current GW
+        if (result.currentGW > 0) {
+          const [bootstrap, live] = await Promise.all([
+            fetchBootstrapData(),
+            fetchLiveData(result.currentGW)
+          ]);
+
+          setBootstrapData(bootstrap);
+          setLiveData(live);
+
+          // Sau khi có bootstrap và live data, fetch picks data cho top managers
+          console.log('🔄 Bắt đầu tải picks data cho top managers...');
+          const picksData = await fetchAllPicksData(result.entries, result.currentGW);
+          setAllPicksData(picksData);
+          console.log(`✅ Đã tải picks data cho ${picksData.size} managers`);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Có lỗi xảy ra khi tải dữ liệu');
         setLeaderboardData([]);
@@ -1034,32 +1247,13 @@ export const FantasyLeaderboard = ({
         setMaxEntries(null);
       } finally {
         setIsLoading(false);
+        setIsGlobalDataLoading(false);
+        setIsPicksDataLoading(false);
       }
     };
 
-    if (mounted) {
-      loadLeaderboardData();
-
-    }
-  }, [currentPage, currentPhase, currentLeagueId, mounted]);
-
-  const handlePreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
-
-  const handleNextPage = () => {
-    if (hasNextPage) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
-
-  const handlePageInput = (pageNumber: number) => {
-    if (pageNumber >= 1) {
-      setCurrentPage(pageNumber);
-    }
-  };
+    loadAllData();
+  }, [mounted, currentLeagueId, currentPhase]);
 
   // Since we only show VNTrip league, just use leaderboardData directly
   const filteredLeaderboardData = leaderboardData;
@@ -1067,28 +1261,22 @@ export const FantasyLeaderboard = ({
   return (
     <div className="container mx-auto py-4 sm:py-8">
       <Card>
-        <CardHeader className="pb-4 mb-4">
+        <CardHeader className='pb-2 px-4 sm:px-6'>
           {/* Title Section - Always visible */}
           <div className="space-y-4">
             <div>
-              <CardTitle className="text-xl sm:text-2xl font-bold mb-2">
-                VNTrip Fantasy League Dashboard
+              <CardTitle className="text-xl sm:text-2xl font-bold mb-0">
+                VNTrip Fantasy League
               </CardTitle>
-              <CardDescription>
-                Bảng xếp hạng Fantasy Premier League của VNTrip
-              </CardDescription>
             </div>
           </div>
         </CardHeader>
 
-        <CardContent className="pt-6 px-4 sm:px-6">
+        <CardContent className="px-4 sm:px-6">
           {/* Leaderboard Content */}
           <div>
             {/* League Info */}
             <div className="mb-6">
-              <h3 className="text-lg font-semibold mb-2">
-                {leagueName || "Đang tải..."} {leagueName && <span className="text-sm text-muted-foreground font-normal">(ID: {currentLeagueId})</span>}
-              </h3>
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 text-sm text-muted-foreground">
                 <div>
                   Gameweek hiện tại: <span className="font-medium">{currentGW > 0 ? currentGW : "Đang tải..."}</span>
@@ -1098,13 +1286,24 @@ export const FantasyLeaderboard = ({
                     👥 Giới hạn league: <span className="font-medium text-blue-600">{maxEntries.toLocaleString()}</span> manager
                   </div>
                 )}
+                {isGlobalDataLoading && (
+                  <div className="flex items-center gap-2 text-blue-600">
+                    <span className="animate-spin">⚽</span>
+                    <span className="text-xs">Đang tải dữ liệu cầu thủ...</span>
+                  </div>
+                )}
+                {isPicksDataLoading && (
+                  <div className="flex items-center gap-2 text-green-600">
+                    <span className="animate-spin">🔄</span>
+                    <span className="text-xs">Đang tải picks data cho top managers...</span>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Team Stats Section - chỉ hiển thị cho league vntrip */}
             {!isLoading && teamStats.length > 0 && currentLeagueId === VNTRIP_LEAGUE_ID && (
               <div className="mb-6">
-                <h3 className="text-lg font-semibold mb-4">Thống kê điểm GW hiện tại theo Team Vntrip</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                   {teamStats.map((team, index) => (
                     <Card key={team.name} className="border-l-4" style={{ borderLeftColor: team.color.replace('bg-', '#') }}>
@@ -1195,12 +1394,22 @@ export const FantasyLeaderboard = ({
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col min-w-0">
-                              <PicksDialog
-                                teamId={entry.entry}
-                                eventId={currentGW}
-                                managerName={entry.manager}
-                                teamName={entry.teamName}
-                              />
+                              <div className="flex items-center gap-2">
+                                <PicksDialog
+                                  teamId={entry.entry}
+                                  eventId={currentGW}
+                                  managerName={entry.manager}
+                                  teamName={entry.teamName}
+                                  globalBootstrapData={bootstrapData}
+                                  globalLiveData={liveData}
+                                  cachedPicksData={allPicksData.get(entry.entry) || null}
+                                />
+                                {allPicksData.has(entry.entry) && (
+                                  <span title="Picks data đã được tải sẵn" className="text-green-500 text-xs">
+                                    ⚡
+                                  </span>
+                                )}
+                              </div>
                               <div className="text-xs text-muted-foreground truncate">
                                 {entry.teamName}
                               </div>
@@ -1224,57 +1433,29 @@ export const FantasyLeaderboard = ({
               </Table>
             </div>
 
-            {/* Pagination Controls */}
-            {!isLoading && filteredLeaderboardData.length > 0 && (
-              <div className="mt-4 space-y-3 sm:space-y-0 sm:flex sm:justify-between sm:items-center">
-                <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handlePreviousPage}
-                    disabled={currentPage <= 1 || isLoading}
-                    className="text-xs sm:text-sm"
-                  >
-                    ← Trước
-                  </Button>
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="hidden sm:inline">Trang</span>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={currentPage}
-                      onChange={(e) => {
-                        const value = parseInt(e.target.value);
-                        if (!isNaN(value)) {
-                          handlePageInput(value);
-                        }
-                      }}
-                      className="w-12 sm:w-16 text-center text-sm"
-                      disabled={isLoading}
-                    />
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleNextPage}
-                    disabled={!hasNextPage || isLoading}
-                    className="text-xs sm:text-sm"
-                  >
-                    Sau →
-                  </Button>
-                </div>
-                <div className="text-xs sm:text-sm text-muted-foreground text-center sm:text-right">
-                  {hasNextPage ? "Có thêm trang" : "Đã hết dữ liệu"}
-                </div>
-              </div>
-            )}
+
           </div>
 
           {!isLoading && (
-            <div className="mt-4 flex justify-between items-center text-sm text-muted-foreground">
-              <div>
-                Cập nhật lần cuối: {lastUpdatedData ? new Date(lastUpdatedData).toLocaleString('vi-VN') : (mounted ? 'Chưa có dữ liệu' : 'Đang tải...')}
+            <div className="mt-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 text-sm text-muted-foreground">
+              <div className="space-y-1">
+                <div>
+                  Cập nhật lần cuối: {lastUpdatedData ? new Date(lastUpdatedData).toLocaleString('vi-VN') : (mounted ? 'Chưa có dữ liệu' : 'Đang tải...')}
+                </div>
+                {allPicksData.size > 0 && (
+                  <div className="flex items-center gap-1 text-green-600">
+                    ⚡ Picks data: <span className="font-medium">{allPicksData.size}</span> managers đã tải sẵn
+                  </div>
+                )}
               </div>
+              {leaderboardData.length > 0 && (
+                <div className="flex items-center gap-1">
+                  👥 Hiển thị <span className="font-medium text-blue-600">{leaderboardData.length.toLocaleString()}</span> thành viên
+                  {maxEntries && (
+                    <span>/ {maxEntries.toLocaleString()} tối đa</span>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
