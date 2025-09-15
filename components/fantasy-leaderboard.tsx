@@ -974,7 +974,7 @@ const TableSkeleton = ({ isSearching = false }: { isSearching?: boolean }) => (
     {/* Show search status message if searching */}
     {isSearching && (
       <TableRow>
-        <TableCell colSpan={5} className="text-center py-4">
+        <TableCell colSpan={3} className="text-center py-4">
           <div className="flex flex-col items-center justify-center space-y-2">
             <div className="flex items-center gap-2 text-blue-600">
               <span className="animate-spin">⏳</span>
@@ -995,14 +995,8 @@ const TableSkeleton = ({ isSearching = false }: { isSearching?: boolean }) => (
         <TableCell>
           <Skeleton className="h-4 w-32" />
         </TableCell>
-        <TableCell>
-          <Skeleton className="h-4 w-28" />
-        </TableCell>
         <TableCell className="text-center">
           <Skeleton className="h-6 w-12 mx-auto" />
-        </TableCell>
-        <TableCell className="text-center">
-          <Skeleton className="h-6 w-16 mx-auto" />
         </TableCell>
       </TableRow>
     ))}
@@ -1202,7 +1196,6 @@ export const FantasyLeaderboard = ({
                     <TableHead className="w-[60px] sm:w-[80px]">Rank</TableHead>
                     <TableHead className="min-w-[120px]">Manager</TableHead>
                     <TableHead className="text-center min-w-[80px]">GW {currentGW}</TableHead>
-                    <TableHead className="text-center min-w-[80px]">Total</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1210,7 +1203,7 @@ export const FantasyLeaderboard = ({
                     <TableSkeleton />
                   ) : error ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8">
+                      <TableCell colSpan={3} className="text-center py-8">
                         <div className="flex flex-col items-center justify-center space-y-2">
                           <span className="text-red-500">⚠️ {error}</span>
                           <span className="text-sm text-muted-foreground">Không thể tải dữ liệu từ API</span>
@@ -1219,13 +1212,13 @@ export const FantasyLeaderboard = ({
                     </TableRow>
                   ) : leaderboardData.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8">
+                      <TableCell colSpan={3} className="text-center py-8">
                         <span className="text-muted-foreground">Không có dữ liệu</span>
                       </TableCell>
                     </TableRow>
                   ) : filteredLeaderboardData.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8">
+                      <TableCell colSpan={3} className="text-center py-8">
                         <span className="text-muted-foreground">
                           Không có dữ liệu
                         </span>
@@ -1255,11 +1248,6 @@ export const FantasyLeaderboard = ({
                                   globalLiveData={liveData}
                                   cachedPicksData={allPicksData.get(entry.entry) || null}
                                 />
-                                {allPicksData.has(entry.entry) && (
-                                  <span title="Picks data đã được tải sẵn" className="text-green-500 text-xs">
-                                    ⚡
-                                  </span>
-                                )}
                               </div>
                               <div className="text-xs text-muted-foreground truncate">
                                 {entry.teamName}
@@ -1270,11 +1258,6 @@ export const FantasyLeaderboard = ({
                             <Badge variant="secondary" className="font-mono text-xs">
                               {entry.gw}
                             </Badge>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <div className="font-bold text-sm sm:text-lg font-mono">
-                              {entry.total.toLocaleString()}
-                            </div>
                           </TableCell>
                         </TableRow>
                       );
