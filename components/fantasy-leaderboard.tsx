@@ -11,11 +11,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "./ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-
 
 // Cấu trúc dữ liệu từ API Fantasy Premier League
 type APILeaderboardEntry = {
@@ -180,6 +178,7 @@ interface FantasyLeaderboardProps {
 
 // Constants
 const VNTRIP_LEAGUE_ID = "1405297";
+const CURRENT_PHASE = 1;
 
 // Hàm để fetch dữ liệu bootstrap (thông tin cầu thủ)
 const fetchBootstrapData = async (): Promise<BootstrapData | null> => {
@@ -357,66 +356,6 @@ const fetchAllLeaderboardData = async (
       entries: [],
       leagueName: "Không thể tải dữ liệu league",
       currentGW: 0,
-      maxEntries: null,
-      lastUpdatedData: ""
-    };
-  }
-};
-
-// Keep the original function for backward compatibility
-const fetchLeaderboardData = async (
-  leagueId: string,
-  pageId: number = 1,
-  phase: number = 1
-): Promise<{ entries: LeaderboardEntry[], leagueName: string, currentGW: number, hasNext: boolean, currentPage: number, maxEntries: number | null, lastUpdatedData: string }> => {
-  try {
-    const params = new URLSearchParams({
-      leagueId: leagueId,
-      pageId: pageId.toString(),
-      phase: phase.toString(),
-    });
-
-    const response = await fetch(`/api/fantasy-leaderboard?${params}`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data: APIResponse = await response.json();
-
-    // Chuyển đổi dữ liệu API sang format component
-    const entries = data.standings.results.map((entry, index) => ({
-      rank: entry.rank,
-      manager: entry.player_name,
-      teamName: entry.entry_name,
-      gw: entry.event_total,
-      total: entry.total,
-      entry: entry.entry,
-    }));
-
-    return {
-      entries,
-      leagueName: data.league.name,
-      currentGW: data.current_event || Math.max(...entries.map(entry => entry.gw)),
-      hasNext: data.standings.has_next,
-      currentPage: data.standings.page,
-      maxEntries: data.league.max_entries,
-      lastUpdatedData: data.last_updated_data
-    };
-  } catch (error) {
-    console.error('Error fetching leaderboard data:', error);
-    // Return empty data if API fails
-    return {
-      entries: [],
-      leagueName: "Không thể tải dữ liệu league",
-      currentGW: 0,
-      hasNext: false,
-      currentPage: 1,
       maxEntries: null,
       lastUpdatedData: ""
     };
@@ -1171,11 +1110,8 @@ export const FantasyLeaderboard = ({
 }: FantasyLeaderboardProps) => {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [teamStats, setTeamStats] = useState<TeamStats[]>([]);
-  const [leagueName, setLeagueName] = useState<string>("");
   const [currentGW, setCurrentGW] = useState<number>(0);
   const [maxEntries, setMaxEntries] = useState<number | null>(null);
-  const [lastUpdatedData, setLastUpdatedData] = useState<string>("");
-  const [currentPhase, setCurrentPhase] = useState<number>(phase);
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1206,13 +1142,11 @@ export const FantasyLeaderboard = ({
 
       try {
         // Fetch all leaderboard data (no pagination)
-        const result = await fetchAllLeaderboardData(currentLeagueId, currentPhase);
+        const result = await fetchAllLeaderboardData(currentLeagueId, CURRENT_PHASE);
 
         setLeaderboardData(result.entries);
-        setLeagueName(result.leagueName);
         setCurrentGW(result.currentGW);
         setMaxEntries(result.maxEntries);
-        setLastUpdatedData(result.lastUpdatedData);
 
         // Tính toán thống kê team chỉ khi là league của vntrip
         if (currentLeagueId === VNTRIP_LEAGUE_ID) {
@@ -1241,7 +1175,6 @@ export const FantasyLeaderboard = ({
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Có lỗi xảy ra khi tải dữ liệu');
         setLeaderboardData([]);
-        setLeagueName("Không thể tải dữ liệu league");
         setCurrentGW(0);
         setTeamStats([]);
         setMaxEntries(null);
@@ -1253,7 +1186,7 @@ export const FantasyLeaderboard = ({
     };
 
     loadAllData();
-  }, [mounted, currentLeagueId, currentPhase]);
+  }, [mounted, currentLeagueId]);
 
   // Since we only show VNTrip league, just use leaderboardData directly
   const filteredLeaderboardData = leaderboardData;
@@ -1432,41 +1365,7 @@ export const FantasyLeaderboard = ({
                 </TableBody>
               </Table>
             </div>
-
-
           </div>
-
-          {!isLoading && (
-            <div className="mt-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 text-sm text-muted-foreground">
-              <div className="space-y-1">
-                <div>
-                  Cập nhật lần cuối: {lastUpdatedData ? new Date(lastUpdatedData).toLocaleString('vi-VN') : (mounted ? 'Chưa có dữ liệu' : 'Đang tải...')}
-                </div>
-                {allPicksData.size > 0 && (
-                  <div className="flex items-center gap-1 text-green-600">
-                    ⚡ Picks data: <span className="font-medium">{allPicksData.size}</span> managers đã tải sẵn
-                  </div>
-                )}
-              </div>
-              {leaderboardData.length > 0 && (
-                <div className="flex items-center gap-1">
-                  👥 Hiển thị <span className="font-medium text-blue-600">{leaderboardData.length.toLocaleString()}</span> thành viên
-                  {maxEntries && (
-                    <span>/ {maxEntries.toLocaleString()} tối đa</span>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {error && (
-            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-              <p className="text-sm text-yellow-800">
-                <strong>Lưu ý:</strong> Đã sử dụng API route để giải quyết vấn đề CORS.
-                Nếu vẫn gặp lỗi, có thể do Fantasy Premier League API đang bảo trì hoặc thay đổi cấu trúc.
-              </p>
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>
