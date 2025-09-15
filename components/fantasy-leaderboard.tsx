@@ -645,62 +645,6 @@ const PicksDialog = ({
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Injury/News Information */}
-            {(playerInfo.news || playerInfo.status !== 'a' || playerInfo.chanceThisRound !== null) && (
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    🏥 Thông tin sức khỏe
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="space-y-2 text-sm">
-                    {playerInfo.news && (
-                      <div className="p-2 bg-yellow-50 border border-yellow-200 rounded">
-                        <div className="font-medium text-yellow-800 mb-1">Tin tức:</div>
-                        <div className="text-yellow-700">{playerInfo.news}</div>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-1 gap-2">
-                      {playerInfo.status !== 'a' && (
-                        <div className="flex justify-between items-center">
-                          <span>Trạng thái:</span>
-                          <div>
-                            {playerInfo.status === 'i' && <Badge variant="destructive" className="text-xs">🚑 Injured</Badge>}
-                            {playerInfo.status === 'd' && <Badge variant="default" className="text-xs bg-yellow-500">⚠️ Doubtful</Badge>}
-                            {playerInfo.status === 's' && <Badge variant="destructive" className="text-xs">⛔ Suspended</Badge>}
-                            {playerInfo.status === 'u' && <Badge variant="secondary" className="text-xs">❌ Unavailable</Badge>}
-                          </div>
-                        </div>
-                      )}
-
-                      {playerInfo.chanceThisRound !== null && (
-                        <div className="flex justify-between">
-                          <span>Khả năng ra sân gameweek này:</span>
-                          <span className={`font-bold ${playerInfo.chanceThisRound <= 25 ? 'text-red-600' :
-                            playerInfo.chanceThisRound <= 75 ? 'text-yellow-600' : 'text-green-600'
-                            }`}>
-                            {playerInfo.chanceThisRound}%
-                          </span>
-                        </div>
-                      )}
-
-                      {playerInfo.chanceNextRound !== null && (
-                        <div className="flex justify-between">
-                          <span>Khả năng ra sân gameweek sau:</span>
-                          <span className={`font-bold ${playerInfo.chanceNextRound <= 25 ? 'text-red-600' :
-                            playerInfo.chanceNextRound <= 75 ? 'text-yellow-600' : 'text-green-600'
-                            }`}>
-                            {playerInfo.chanceNextRound}%
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
             {/* Tổng quan điểm */}
             <Card>
               <CardHeader className="pb-2">
@@ -864,33 +808,7 @@ const PicksDialog = ({
           </div>
         ) : picksData ? (
           <div className="space-y-4">
-            {/* Event Summary */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm sm:text-base">Thống kê Gameweek</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="grid grid-cols-3 gap-2 text-sm">
-                  <div className="flex flex-col items-center text-center p-1.5 bg-muted/30 rounded">
-                    <span className="text-muted-foreground mb-0.5 text-xs">Điểm GW</span>
-                    <span className="font-bold text-lg">{picksData.entry_history.points}</span>
-                  </div>
-                  <div className="flex flex-col items-center text-center p-1.5 bg-muted/30 rounded">
-                    <span className="text-muted-foreground mb-0.5 text-xs">Tiền còn lại</span>
-                    <span className="font-bold text-lg">£{(picksData.entry_history.bank / 10).toFixed(1)}m</span>
-                  </div>
-                  <div className="flex flex-col items-center text-center p-1.5 bg-muted/30 rounded">
-                    <span className="text-muted-foreground mb-0.5 text-xs">Xếp hạng</span>
-                    <span className="font-bold text-lg">{picksData.entry_history.overall_rank?.toLocaleString() || 'N/A'}</span>
-                  </div>
-                </div>
-                {picksData.active_chip && (
-                  <div className="mt-3 pt-2 border-t text-center">
-                    <Badge variant="default" className="text-xs">Chip: {picksData.active_chip}</Badge>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+
 
             {/* Formation Pitch Display */}
             <Card>
