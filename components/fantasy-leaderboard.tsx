@@ -1023,7 +1023,6 @@ export const FantasyLeaderboard = ({
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [teamStats, setTeamStats] = useState<TeamStats[]>([]);
   const [currentGW, setCurrentGW] = useState<number>(0);
-  const [maxEntries, setMaxEntries] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1058,7 +1057,6 @@ export const FantasyLeaderboard = ({
 
         setLeaderboardData(result.entries);
         setCurrentGW(result.currentGW);
-        setMaxEntries(result.maxEntries);
 
         // Tính toán thống kê team chỉ khi là league của vntrip
         if (currentLeagueId === VNTRIP_LEAGUE_ID) {
@@ -1089,7 +1087,6 @@ export const FantasyLeaderboard = ({
         setLeaderboardData([]);
         setCurrentGW(0);
         setTeamStats([]);
-        setMaxEntries(null);
       } finally {
         setIsLoading(false);
         setIsGlobalDataLoading(false);
@@ -1126,11 +1123,6 @@ export const FantasyLeaderboard = ({
                 <div>
                   Gameweek hiện tại: <span className="font-medium">{currentGW > 0 ? currentGW : "Đang tải..."}</span>
                 </div>
-                {maxEntries && (
-                  <div className="flex items-center gap-1">
-                    👥 Giới hạn league: <span className="font-medium text-blue-600">{maxEntries.toLocaleString()}</span> manager
-                  </div>
-                )}
                 {isGlobalDataLoading && (
                   <div className="flex items-center gap-2 text-blue-600">
                     <span className="animate-spin">⚽</span>
