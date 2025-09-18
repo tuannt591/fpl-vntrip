@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
 import {
   Table,
   TableBody,
@@ -199,25 +198,9 @@ const PicksDialog = ({
 }) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  // Helper function to organize players by position - simplified to basic formation
-  const organizeByFormation = (picks: PickWithLive[]) => {
-    const startingEleven = picks
-      .filter(pick => pick.position <= 11)
-      .sort((a, b) => a.position - b.position);
-
-    // Simple formation based on positions 1-11
-    const goalkeeper = startingEleven.slice(0, 1); // Position 1
-    const defenders = startingEleven.slice(1, 5); // Positions 2-5
-    const midfielders = startingEleven.slice(5, 9); // Positions 6-9  
-    const forwards = startingEleven.slice(9, 11); // Positions 10-11
-
-    return { goalkeeper, defenders, midfielders, forwards };
-  };
-
   // Component hiển thị thông tin chi tiết cầu thủ
   const PlayerDetailDialog = ({
     pick,
-    isCompact = false
   }: {
     pick: PickWithLive;
     isCompact?: boolean;
@@ -232,45 +215,20 @@ const PicksDialog = ({
     return (
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogTrigger asChild>
-          <div className={`bg-gradient-to-b from-green-600 to-green-700 text-white rounded-lg shadow-lg border-[1px] border-white relative cursor-pointer hover:from-green-700 hover:to-green-800 transition-all transform hover:scale-105`}>
-            {/* Captain/Vice-Captain indicators - top right */}
-            {pick.position <= 11 && pick.is_captain && (
-              <div className="absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 w-4 h-4 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center text-[10px] font-medium border-[1px] border-white z-10">
-                C
-              </div>
-            )}
-            {pick.position <= 11 && pick.is_vice_captain && (
-              <div className="absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 w-4 h-4 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full flex items-center justify-center text-[10px] font-medium border-[1px] border-white z-10">
-                V
-              </div>
-            )}
-            {/* Player name */}
-            <div className={`font-medium w-full p-1 ${isCompact ? 'text-xs leading-tight' : 'text-xs sm:text-sm'} truncate`}>
-              {playerName}
-            </div>
-            {/* Points */}
-            <div className={`${isCompact ? 'text-xs font-medium' : 'text-sm sm:text-base font-medium'} bg-white text-green-700 text-center rounded-bl-lg rounded-br-lg`}>
-              {displayPoints}
-            </div>
-          </div>
+          <div className="font-medium truncate cursor-pointer">{playerName}</div>
         </DialogTrigger>
         <DialogContent className="max-w-sm sm:max-w-md max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 flex-wrap">
               {playerName}
-              {pick.is_captain && <Badge className="bg-yellow-500">Đội trưởng</Badge>}
-              {pick.is_vice_captain && <Badge className="bg-blue-500">Đội phó</Badge>}
             </DialogTitle>
-            <DialogDescription>
-              Gameweek {eventId}
-            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             {/* Tổng quan điểm */}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Điểm số Gameweek</CardTitle>
+                <CardTitle className="text-sm">Điểm số Gameweek {eventId}</CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="text-2xl font-bold text-center">
@@ -351,7 +309,6 @@ const PicksDialog = ({
                   <div className="space-y-2">
                     {playerExplain.map((fixture: any, index: number) => (
                       <div key={index} className="border rounded p-2">
-                        <div className="font-medium text-sm mb-1">Trận đấu #{fixture.fixture}</div>
                         <div className="space-y-1">
                           {fixture.stats.map((stat: any, statIndex: number) => (
                             <div key={statIndex} className="flex justify-between text-xs">
@@ -383,23 +340,11 @@ const PicksDialog = ({
     );
   };
 
-  // Component to display individual player card
-  const PlayerCard = ({ pick, isCompact = false }: { pick: PickWithLive; isCompact?: boolean }) => {
-    return (
-      <div className="relative w-full text-center">
-        <PlayerDetailDialog
-          pick={pick}
-          isCompact={isCompact}
-        />
-      </div>
-    );
-  };
-
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
       <DialogTrigger asChild>
         <button
-          className="text-left hover:text-blue-600 hover:underline transition-colors disabled:opacity-50"
+          className="text-left hover:text-blue-600 hover:underline transition-colors"
           onClick={() => setIsDialogOpen(true)}
         >
           <div className="font-medium flex items-center gap-1">
@@ -407,9 +352,9 @@ const PicksDialog = ({
           </div>
         </button>
       </DialogTrigger>
-      <DialogContent className="max-w-sm sm:max-w-lg md:max-w-2xl max-h-[85vh] overflow-y-auto p-4 sm:p-6">
-        <DialogHeader>
-          <DialogTitle className="text-base sm:text-lg">Đội hình</DialogTitle>
+      <DialogContent className="max-w-sm sm:max-w-lg md:max-w-2xl max-h-[85vh] overflow-y-auto p-4">
+        <DialogHeader className='bg-white dark:bg-gray-800'>
+          <DialogTitle className="text-lg">Đội hình</DialogTitle>
           <DialogDescription className="text-sm">
             {managerName} ({teamName})
           </DialogDescription>
@@ -417,10 +362,9 @@ const PicksDialog = ({
 
         {picksData ? (
           <div className="space-y-4">
-            {/* Formation Pitch Display */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                <CardTitle className="text-base flex items-center gap-2">
                   ⚽ Đội hình ra sân
                   {picksData?.active_chip && (
                     <Badge variant="secondary" className="text-xs">
@@ -429,103 +373,41 @@ const PicksDialog = ({
                   )}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-0 p-2 sm:p-6">
+              <CardContent className="pt-0">
                 {picksData?.picks.length > 0 ? (
-                  <div className="relative w-full max-w-5xl mx-auto">
-                    {/* Pitch Background */}
-                    <div className="relative w-full" style={{ aspectRatio: '1417/788' }}>
-                      <Image
-                        src="/pitch-graphic-t77-OTdp.svg"
-                        alt="Football Pitch"
-                        width={1417}
-                        height={788}
-                        className="w-full h-[400px] object-cover"
-                        priority
-                      />
-
-                      {/* Player positions overlay */}
-                      <div className="absolute inset-0">
-                        {(() => {
-                          const formation = organizeByFormation(picksData.picks);
-
+                  <>
+                    <ul className="divide-y divide-gray-200">
+                      {picksData.picks
+                        .filter(pick => pick.position <= 11)
+                        .sort((a, b) => a.position - b.position)
+                        .map((pick) => {
+                          // Xác định vị trí thi đấu
+                          let viTri = '';
+                          if (pick.position === 1) viTri = 'GK';
+                          else if (pick.position >= 2 && pick.position <= 5) viTri = 'DEF';
+                          else if (pick.position >= 6 && pick.position <= 9) viTri = 'MID';
+                          else if (pick.position >= 10 && pick.position <= 11) viTri = 'FWD';
+                          const minutes = pick.liveData?.stats?.minutes ?? '-';
                           return (
-                            <>
-                              {/* Goalkeeper */}
-                              <div className="absolute" style={{
-                                bottom: '3%',
-                                left: '50%',
-                                transform: 'translateX(-50%)'
-                              }}>
-                                {formation.goalkeeper.map((pick) => (
-                                  <div key={pick.element} className="relative w-[5rem]">
-                                    <PlayerCard pick={pick} isCompact={true} />
-                                  </div>
-                                ))}
+                            <li key={pick.position} className="py-2 flex items-center gap-2">
+                              <div className="flex-1 min-w-0">
+                                {/* <div className="font-medium truncate">{pick.elementName || `Cầu thủ #${pick.element}`}</div> */}
+                                <PlayerDetailDialog
+                                  pick={pick}
+                                />
+                                <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+                                  <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700 font-semibold border border-gray-200 min-w-[36px] text-center">{viTri}</span>
+                                  <span>{minutes}&apos;</span>
+                                </div>
                               </div>
-
-                              {/* Defenders */}
-                              <div className="absolute flex justify-center items-center gap-2 sm:gap-4" style={{
-                                bottom: '25%',
-                                left: '50%',
-                                transform: 'translateX(-50%)',
-                                width: '100%'
-                              }}>
-                                {formation.defenders.map((pick, index) => (
-                                  <div key={pick.element} className="flex justify-center relative w-[20%]">
-                                    <PlayerCard pick={pick} isCompact={true} />
-                                  </div>
-                                ))}
-                              </div>
-
-                              {/* Midfielders */}
-                              <div className="absolute flex justify-center items-center gap-2 sm:gap-4" style={{
-                                bottom: '50%',
-                                left: '50%',
-                                transform: 'translateX(-50%)',
-                                width: '100%'
-                              }}>
-                                {formation.midfielders.map((pick, index) => (
-                                  <div key={pick.element} className="flex justify-center relative w-[20%]">
-                                    <PlayerCard pick={pick} isCompact={true} />
-                                  </div>
-                                ))}
-                              </div>
-
-                              {/* Forwards */}
-                              <div className="absolute flex justify-center items-center gap-2 sm:gap-4" style={{
-                                bottom: '73%',
-                                left: '50%',
-                                transform: 'translateX(-50%)',
-                                width: '100%'
-                              }}>
-                                {formation.forwards.map((pick, index) => (
-                                  <div key={pick.element} className="flex justify-center relative w-[20%]">
-                                    <PlayerCard pick={pick} isCompact={true} />
-                                  </div>
-                                ))}
-                              </div>
-                            </>
+                              {pick.is_captain && <Badge className="bg-yellow-500">C</Badge>}
+                              {pick.is_vice_captain && <Badge className="bg-blue-500">VC</Badge>}
+                              <span className="font-mono text-green-700">{(pick.liveData?.stats?.total_points || 0) * pick.multiplier}</span>
+                            </li>
                           );
-                        })()}
-                      </div>
-                    </div>
-
-                    {/* Formation Info */}
-                    {(() => {
-                      const formation = organizeByFormation(picksData.picks);
-                      const formationString = `${formation.defenders.length}-${formation.midfielders.length}-${formation.forwards.length}`;
-
-                      return (
-                        <div className="mt-4 text-center space-y-3">
-                          <div className="flex justify-center items-center gap-4 flex-wrap">
-                            <Badge variant="outline" className="text-sm px-3 py-1">
-                              ⚽ Sơ đồ: {formationString}
-                            </Badge>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
+                        })}
+                    </ul>
+                  </>
                 ) : (
                   <div className="text-center py-8">
                     <span className="text-muted-foreground">Không có dữ liệu đội hình</span>
@@ -533,30 +415,42 @@ const PicksDialog = ({
                 )}
               </CardContent>
             </Card>
-
-            {/* Bench */}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                <CardTitle className="text-base flex items-center gap-2">
                   🪑 Ghế dự bị
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
                 {picksData?.picks.filter(pick => pick.position > 11).length > 0 ? (
-                  <div className="space-y-3">
-                    <div className="bg-gray-50 border-[1px] border-dashed border-gray-200 rounded-lg p-3 sm:p-4">
-                      <div className="flex justify-center gap-1 flex-wrap">
-                        {picksData.picks
-                          .filter(pick => pick.position > 11)
-                          .sort((a, b) => a.position - b.position)
-                          .map((pick) => (
-                            <div key={pick.position} className="relative w-[23%]">
-                              <PlayerCard pick={pick} isCompact={true} />
+                  <ul className="divide-y divide-gray-200">
+                    {picksData.picks
+                      .filter(pick => pick.position > 11)
+                      .sort((a, b) => a.position - b.position)
+                      .map((pick) => {
+                        // Xác định vị trí thi đấu cho dự bị
+                        let viTri = '';
+                        if (pick.position === 12) viTri = 'GK';
+                        else if (pick.position === 13 || pick.position === 14) viTri = 'DEF/MID';
+                        else if (pick.position === 15) viTri = 'FWD';
+                        const minutes = pick.liveData?.stats?.minutes ?? '-';
+                        return (
+                          <li key={pick.position} className="py-2 flex items-center gap-2">
+                            <div className="flex-1 min-w-0">
+                              {/* <div className="font-medium truncate">{pick.elementName || `Cầu thủ #${pick.element}`}</div> */}
+                              <PlayerDetailDialog
+                                pick={pick}
+                              />
+                              <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+                                <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700 font-semibold border border-gray-200 min-w-[36px] text-center">{viTri}</span>
+                                <span>{minutes}&apos;</span>
+                              </div>
                             </div>
-                          ))}
-                      </div>
-                    </div>
-                  </div>
+                            <span className="font-mono text-green-700">{pick.liveData?.stats?.total_points || 0}</span>
+                          </li>
+                        );
+                      })}
+                  </ul>
                 ) : (
                   <div className="text-center py-8">
                     <span className="text-muted-foreground">Không có cầu thủ dự bị</span>
