@@ -73,6 +73,28 @@ async function getPicksByEntryId(
   return null;
 }
 
+async function getTransferByEntryId(entryId: number): Promise<any> {
+  try {
+    const response = await fetch(
+      `https://fantasy.premierleague.com/api/entry/${entryId}/transfers/`,
+      {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+      }
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      return data;
+    }
+  } catch (error) {
+    console.error('Error fetching picks data:', error);
+  }
+  return null;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const leagueId = searchParams.get('leagueId') || '314';
@@ -125,6 +147,35 @@ export async function GET(request: NextRequest) {
           picks: picksWithLive,
         };
 
+        // Kiểm tra chip và số transfer
+        const chipUsed = picksData.active_chip;
+        const eventTransfers = picksData.entry_history?.event_transfers ?? 0;
+
+        let transfersThisGW: any[] = [];
+        let transfersWithNames: any[] = [];
+
+        if (
+          chipUsed !== 'wildcard' &&
+          chipUsed !== 'freehit' &&
+          eventTransfers > 0
+        ) {
+          const allTransfers = await getTransferByEntryId(entry.entry);
+          transfersThisGW = Array.isArray(allTransfers)
+            ? allTransfers.filter((t: any) => t.event === currentEvent)
+            : [];
+
+          transfersWithNames = transfersThisGW.map((t: any) => {
+            const inPlayer = elements.find((el: any) => el.id === t.element_in);
+            const outPlayer = elements.find(
+              (el: any) => el.id === t.element_out
+            );
+            return {
+              element_in_name: inPlayer ? inPlayer.web_name : undefined,
+              element_out_name: outPlayer ? outPlayer.web_name : undefined,
+            };
+          });
+        }
+
         // Tính điểm GW thực tế
         let gwPoint = picksData.entry_history?.points ?? entry.gw;
         let transferCost = picksData.entry_history?.event_transfers_cost ?? 0;
@@ -138,6 +189,10 @@ export async function GET(request: NextRequest) {
           entry: entry.entry,
           picksData: picksDataWithLive,
           gwPoint: gwPoint,
+          // Chỉ thêm thông tin transfers nếu có
+          ...(transfersWithNames.length > 0 && {
+            transfers: transfersWithNames,
+          }),
         };
       })
     );
