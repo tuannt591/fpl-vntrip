@@ -18,7 +18,8 @@ const CURRENT_PHASE = 1;
 
 const fetchFantasyVntripData = async (
   leagueId: string,
-  phase: number = 1
+  phase: number = 1,
+  gw: number = 0
 ): Promise<any> => {
   try {
 
@@ -26,6 +27,10 @@ const fetchFantasyVntripData = async (
       leagueId: leagueId,
       phase: phase.toString(),
     });
+
+    if (gw > 0) {
+      params.append('gw', gw.toString());
+    }
 
     const response = await fetch(`/api/fantasy-vntrip?${params}`, {
       method: 'GET',
@@ -118,6 +123,7 @@ export const FantasyLeaderboard = ({
   const [mounted, setMounted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [selectedGW, setSelectedGW] = useState<number>(0);
   const currentLeagueId = VNTRIP_LEAGUE_ID;
 
   useEffect(() => {
@@ -127,6 +133,7 @@ export const FantasyLeaderboard = ({
   // Hàm reload dữ liệu
   const reloadData = () => {
     setReloadKey(prev => prev + 1);
+    setSelectedGW(0);
   };
 
   // Load all data once when component mounts hoặc khi reloadKey thay đổi
@@ -138,18 +145,11 @@ export const FantasyLeaderboard = ({
       setError(null);
 
       try {
-        const result = await fetchFantasyVntripData(currentLeagueId, CURRENT_PHASE);
+        const result = await fetchFantasyVntripData(currentLeagueId, CURRENT_PHASE, selectedGW);
 
         setLeaderboardData(result.entries);
         setCurrentGW(result.currentGW);
-
-        // Tính toán thống kê team chỉ khi là league của vntrip
-        if (currentLeagueId === VNTRIP_LEAGUE_ID) {
-          const stats = calculateTeamStats(result.entries);
-          setTeamStats(stats);
-        } else {
-          setTeamStats([]);
-        }
+        setTeamStats(calculateTeamStats(result.entries));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Có lỗi xảy ra khi tải dữ liệu');
         setLeaderboardData([]);
@@ -161,45 +161,50 @@ export const FantasyLeaderboard = ({
     };
 
     loadAllData();
-  }, [mounted, currentLeagueId, reloadKey]);
+  }, [mounted, currentLeagueId, reloadKey, selectedGW]);
 
   return (
     <div className="container mx-auto py-4 sm:py-8">
       <Card className='border-none shadow-none bg-transparent'>
-        <CardHeader className='pb-2 px-0'>
-          {/* Title Section - Always visible */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-xl sm:text-2xl font-bold mb-0">
-                VNTrip Fantasy League
-              </CardTitle>
-              {/* Nút reload */}
-              <button
-                onClick={reloadData}
-                className="ml-2 px-2 py-1 rounded bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium flex items-center gap-1 disabled:opacity-60"
-                disabled={isLoading}
-                title="Tải lại dữ liệu"
-                type="button"
-              >
-                <span className={isLoading ? 'animate-spin' : ''}>🔄</span>
-                Reload
-              </button>
+        <CardHeader className='px-0 pt-0'>
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              Gameweek:&nbsp;
+              {isLoading ? (
+                <span>Đang tải...</span>
+              ) : (
+                <select
+                  value={selectedGW}
+                  onChange={e => {
+                    setSelectedGW(Number(e.target.value))
+                  }}
+                  className="border rounded px-1 py-0.5"
+                >
+                  {Array.from({ length: currentGW }, (_, i) => currentGW - i).map(gw => (
+                    <option key={gw} value={gw}>
+                      GW {gw}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
+
+            {/* Nút reload */}
+            <button
+              onClick={reloadData}
+              className="ml-2 px-2 py-1 rounded bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium flex items-center gap-1 disabled:opacity-60"
+              disabled={isLoading}
+              title="Tải lại dữ liệu"
+              type="button"
+            >
+              <span className={isLoading ? 'animate-spin' : ''}>🔄</span>
+              Reload
+            </button>
           </div>
         </CardHeader>
 
         <CardContent className="px-0">
-          {/* Leaderboard Content */}
           <div>
-            {/* League Info */}
-            <div className="mb-6">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 text-sm text-muted-foreground">
-                <div>
-                  Gameweek hiện tại: <span className="font-medium">{currentGW > 0 ? currentGW : "Đang tải..."}</span>
-                </div>
-              </div>
-            </div>
-
             {/* Team Stats Section - chỉ hiển thị cho league vntrip */}
             {!isLoading && teamStats.length > 0 && currentLeagueId === VNTRIP_LEAGUE_ID && (
               <div className="mb-6">
@@ -225,7 +230,7 @@ export const FantasyLeaderboard = ({
                   <div className="w-10">Rank</div>
                   <div className='px-1' style={{ width: 'calc(100% - 12rem)' }}>Manager</div>
                   <div className="w-[6rem] text-center">(C)</div>
-                  <div className="w-10 text-center">GW {currentGW}</div>
+                  <div className="w-10 text-center">GW</div>
                   <div className="w-4">&nbsp;</div>
                 </div>
               </div>
@@ -240,7 +245,7 @@ export const FantasyLeaderboard = ({
               ) : leaderboardData.length === 0 ? (
                 <div className="text-center py-4 text-muted-foreground">Không có dữ liệu</div>
               ) : (
-                <ManagerAccordionList managers={leaderboardData} currentGW={currentGW} />
+                <ManagerAccordionList managers={leaderboardData} />
               )}
             </div>
           </div>

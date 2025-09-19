@@ -6,12 +6,10 @@ import { LeaderboardEntry } from "@/types/fantasy";
 
 interface ManagerAccordionListProps {
   managers: LeaderboardEntry[];
-  currentGW: number;
 }
 
 export const ManagerAccordionList = ({
   managers,
-  currentGW,
 }: ManagerAccordionListProps) => {
   const [selectedPlayer, setSelectedPlayer] = useState<any | null>(null);
 
@@ -170,7 +168,7 @@ export const ManagerAccordionList = ({
 
                 {/* ---------------------GW----------------------- */}
                 <div className="w-10 text-center">
-                  <p className="font-semibold">{entry.gwPoint}</p>
+                  <p className="font-semibold text-green-700 text-lg">{entry.gwPoint}</p>
                   {transferCost ? <p className="text-xs font-medium text-red-500">(-{transferCost})</p> : null}
                 </div>
 

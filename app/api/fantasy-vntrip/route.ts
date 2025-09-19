@@ -100,10 +100,13 @@ export async function GET(request: NextRequest) {
   const leagueId = searchParams.get('leagueId') || '314';
   // const pageId = searchParams.get('pageId') || '1';
   const phase = searchParams.get('phase') || '1';
+  const gw = searchParams.get('gw') || '0';
 
   try {
     const { currentEvent, elements } = await getBootstrapData();
-    const liveData = await getElementLiveByEventId(currentEvent);
+    const eventID = gw && parseInt(gw) > 0 ? parseInt(gw) : currentEvent;
+
+    const liveData = await getElementLiveByEventId(eventID);
 
     const response = await fetch(
       `https://fantasy.premierleague.com/api/leagues-classic/${leagueId}/standings/?page_standings=1&phase=${phase}`,
@@ -125,7 +128,7 @@ export async function GET(request: NextRequest) {
 
     let entriesWithPicks = await Promise.all(
       leagueData.standings.results.map(async (entry: any) => {
-        const picksData = await getPicksByEntryId(entry.entry, currentEvent);
+        const picksData = await getPicksByEntryId(entry.entry, eventID);
 
         const picksWithLive = picksData.picks.map((pick: any) => {
           let live = null;
@@ -161,7 +164,7 @@ export async function GET(request: NextRequest) {
         ) {
           const allTransfers = await getTransferByEntryId(entry.entry);
           transfersThisGW = Array.isArray(allTransfers)
-            ? allTransfers.filter((t: any) => t.event === currentEvent)
+            ? allTransfers.filter((t: any) => t.event === eventID)
             : [];
 
           transfersWithNames = transfersThisGW.map((t: any) => {
