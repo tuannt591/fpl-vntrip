@@ -254,73 +254,94 @@ export async function GET(request: NextRequest) {
         }
 
         // 👉 Auto Sub Logic
-        function getPosition(elementId: number) {
-          const player = elements.find((el: any) => el.id === elementId);
-          // element_type: 1=GK, 2=DEF, 3=MID, 4=FWD
-          return player?.element_type;
-        }
-
-        function isGoalkeeper(elementId: number) {
-          return getPosition(elementId) === 1;
-        }
-
-        function isValidFormation(
-          startingXI: any[],
-          outPlayer: any,
-          inPlayer: any
-        ) {
-          let counts = { GK: 0, DEF: 0, MID: 0, FWD: 0 };
-
-          startingXI.forEach(p => {
-            if (p.element !== outPlayer.element) {
-              const pos = getPosition(p.element);
-              if (pos === 1) counts.GK++;
-              if (pos === 2) counts.DEF++;
-              if (pos === 3) counts.MID++;
-              if (pos === 4) counts.FWD++;
-            }
-          });
-
-          // Thêm inPlayer
-          const inPos = getPosition(inPlayer.element);
-          if (inPos === 1) counts.GK++;
-          if (inPos === 2) counts.DEF++;
-          if (inPos === 3) counts.MID++;
-          if (inPos === 4) counts.FWD++;
-
-          return (
-            counts.GK === 1 &&
-            counts.DEF >= 3 &&
-            counts.MID >= 2 &&
-            counts.FWD >= 1 &&
-            counts.GK + counts.DEF + counts.MID + counts.FWD === 11
-          );
-        }
-
-        function replacePlayer(
-          startingXI: any[],
-          outPlayer: any,
-          inPlayer: any
-        ) {
-          const index = startingXI.findIndex(
-            p => p.element === outPlayer.element
-          );
-          if (index !== -1) {
-            console.log(
-              `[AutoSub][${entry.entry_name}]`,
-              `OUT: ${outPlayer.elementName} (${outPlayer.element})`,
-              `=> IN: ${inPlayer.elementName} (${inPlayer.element})`
-            );
-            startingXI[index] = inPlayer;
+        function applyAutoSub(picks: any[], activeChip?: string) {
+          function getPosition(elementId: number) {
+            const player = elements.find((el: any) => el.id === elementId);
+            // element_type: 1=GK, 2=DEF, 3=MID, 4=FWD
+            return player?.element_type;
           }
-        }
 
-        function applyAutoSub(picks: any[]) {
+          function isGoalkeeper(elementId: number) {
+            return getPosition(elementId) === 1;
+          }
+
+          function isValidFormation(
+            startingXI: any[],
+            outPlayer: any,
+            inPlayer: any
+          ) {
+            let counts = { GK: 0, DEF: 0, MID: 0, FWD: 0 };
+
+            startingXI.forEach(p => {
+              if (p.element !== outPlayer.element) {
+                const pos = getPosition(p.element);
+                if (pos === 1) counts.GK++;
+                if (pos === 2) counts.DEF++;
+                if (pos === 3) counts.MID++;
+                if (pos === 4) counts.FWD++;
+              }
+            });
+
+            // Thêm inPlayer
+            const inPos = getPosition(inPlayer.element);
+            if (inPos === 1) counts.GK++;
+            if (inPos === 2) counts.DEF++;
+            if (inPos === 3) counts.MID++;
+            if (inPos === 4) counts.FWD++;
+
+            return (
+              counts.GK === 1 &&
+              counts.DEF >= 3 &&
+              counts.MID >= 2 &&
+              counts.FWD >= 1 &&
+              counts.GK + counts.DEF + counts.MID + counts.FWD === 11
+            );
+          }
+
+          function replacePlayer(
+            startingXI: any[],
+            outPlayer: any,
+            inPlayer: any
+          ) {
+            const index = startingXI.findIndex(
+              p => p.element === outPlayer.element
+            );
+            if (index !== -1) {
+              console.log(
+                `[AutoSub][${entry.entry_name}]`,
+                `OUT: ${outPlayer.elementName} (${outPlayer.element})`,
+                `=> IN: ${inPlayer.elementName} (${inPlayer.element})`
+              );
+
+              // Gán multiplier
+              outPlayer.multiplier = 0; // cầu thủ chính không đá
+              if (inPlayer.is_captain) {
+                // Captain bench lên thay
+                inPlayer.multiplier = activeChip === '3xc' ? 3 : 2;
+              } else {
+                inPlayer.multiplier = 1; // bench bình thường
+              }
+
+              startingXI[index] = inPlayer;
+            }
+          }
+
           let startingXI = picks.filter(p => p.position <= 11);
           let bench = picks
             .filter(p => p.position > 11)
             .sort((a, b) => a.position - b.position);
 
+          // Trường hợp Captain không ra sân => Vice giữ multiplier
+          const captain = picks.find(p => p.is_captain);
+          const vice = picks.find(p => p.is_vice_captain);
+          if (captain && (captain.liveData?.stats?.minutes ?? 0) === 0) {
+            if (vice && (vice.liveData?.stats?.minutes ?? 0) > 0) {
+              vice.multiplier = captain.multiplier; // copy multiplier (2 hoặc 3)
+              captain.multiplier = 0;
+            }
+          }
+
+          // Auto-sub bình thường
           for (let player of [...startingXI]) {
             const minutes = player.liveData?.stats?.minutes ?? 0;
 
@@ -345,17 +366,80 @@ export async function GET(request: NextRequest) {
               }
             }
           }
+
           return startingXI;
+
+          // Clone picks để không sửa trực tiếp
+          // let updatedPicks = [...picks.map(p => ({ ...p }))];
+
+          // const starters = updatedPicks.filter(p => p.position <= 11);
+          // const bench = updatedPicks.filter(p => p.position > 11);
+
+          // // Captain info
+          // const captain = updatedPicks.find((p: any) => p.is_captain);
+          // const viceCaptain = updatedPicks.find((p: any) => p.is_vice_captain);
+          // const isTripleCaptain = activeChip === '3xc';
+
+          // // Đặt multiplier mặc định: đá chính = 1, captain = 2/3, bench = 0
+          // starters.forEach(p => {
+          //   p.multiplier = 1;
+          //   if (p.is_captain) p.multiplier = isTripleCaptain ? 3 : 2;
+          // });
+          // bench.forEach(p => (p.multiplier = 0));
+
+          // // Kiểm tra từng cầu thủ đá chính
+          // for (const starter of starters) {
+          //   const minutes = starter.liveData?.stats?.minutes ?? 0;
+
+          //   if (minutes === 0) {
+          //     // Starter không ra sân -> cần sub
+          //     starter.multiplier = 0;
+
+          //     if (starter.element_type === 1) {
+          //       // GK (element_type = 1)
+          //       const gkSub = bench.find(p => p.element_type === 1);
+          //       if (gkSub) gkSub.multiplier = 1;
+          //     } else {
+          //       // Outfield (DEF/MID/FWD), theo thứ tự bench
+          //       const sub = bench.find(
+          //         p =>
+          //           p.element_type !== 1 &&
+          //           p.liveData?.stats?.minutes > 0 &&
+          //           p.multiplier === 0
+          //       );
+          //       if (sub) sub.multiplier = 1;
+          //     }
+          //   }
+          // }
+
+          // // Nếu captain không ra sân thì VC thay multiplier
+          // if (
+          //   captain &&
+          //   captain.liveData?.stats?.minutes === 0 &&
+          //   viceCaptain
+          // ) {
+          //   const vcMinutes = viceCaptain.liveData?.stats?.minutes;
+          //   if (vcMinutes > 0) {
+          //     viceCaptain.multiplier = isTripleCaptain ? 3 : 2;
+          //   }
+          // }
+
+          // return updatedPicks;
         }
 
         // Áp dụng autosub
-        const startingXI = applyAutoSub(picksWithLive);
+        const picksWithAutoSubs = applyAutoSub(
+          picksWithLive,
+          picksData.active_chip
+        );
 
         // 👉 Tính điểm GW thực tế từ 11 cầu thủ sau autosub
-        let gwPoint = startingXI.reduce((sum: number, pick: any) => {
-          const playerPoints = pick.liveData?.stats?.total_points ?? 0;
-          return sum + playerPoints * pick.multiplier;
-        }, 0);
+        let gwPoint = picksWithLive
+          .filter((pick: any) => pick.position <= 11) // chỉ lấy 11 cầu thủ chính
+          .reduce((sum: number, pick: any) => {
+            const playerPoints = pick.liveData?.stats?.total_points ?? 0;
+            return sum + playerPoints * pick.multiplier;
+          }, 0);
 
         // Trừ điểm trừ chuyển nhượng
         let transferCost = picksData.entry_history?.event_transfers_cost ?? 0;

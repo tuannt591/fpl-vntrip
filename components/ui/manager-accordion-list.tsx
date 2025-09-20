@@ -64,7 +64,7 @@ export const ManagerAccordionList = ({
 
     // Danh sách chỉ số hiển thị
     const statList = [
-      { key: "total_points", label: "Điểm", value: (stats.total_points || 0) * multiplier },
+      { key: "total_points", label: "Điểm", value: position > 11 ? (stats.total_points || 0) : (stats.total_points || 0) * multiplier },
       { key: "minutes", label: "Phút thi đấu", value: stats.minutes ?? "-" },
       { key: "goals_scored", label: "Bàn thắng", value: stats.goals_scored ?? 0 },
       { key: "assists", label: "Kiến tạo", value: stats.assists ?? 0 },
@@ -256,7 +256,7 @@ export const ManagerAccordionList = ({
                               <span className="text-muted-foreground"> - {minutes}&apos;</span>
                             </span>
                             <span className="font-mono text-green-700 font-semibold">
-                              {(pick.liveData?.stats.total_points || 0) * pick.multiplier}
+                              {pick.position > 11 ? (pick.liveData?.stats.total_points || 0) : (pick.liveData?.stats.total_points || 0) * pick.multiplier}
                             </span>
                           </div>
                         )
