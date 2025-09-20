@@ -80,6 +80,7 @@ export type LeaderboardEntry = {
   entry: number;
   picksData?: PicksDataWithLive | null;
   transfers: Transfer[];
+  team: string | undefined;
 };
 
 export type TeamConfig = {

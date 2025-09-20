@@ -18,6 +18,7 @@ async function getBootstrapData(): Promise<any> {
       return {
         currentEvent: currentEvent ? currentEvent.id : 1,
         elements: data.elements,
+        teams: data.teams,
       };
     }
   } catch (error) {
@@ -95,6 +96,19 @@ async function getTransferByEntryId(entryId: number): Promise<any> {
   return null;
 }
 
+// Thêm hàm xác định team theo entryId
+function getTeamByEntryId(entryId: number): string | undefined {
+  const teams: { [key: string]: number[] } = {
+    '87': [2195023, 6293111, 6291846],
+    '89': [4565469, 4550400, 5005626],
+    '3T': [6400474, 3024127, 6425684],
+  };
+  for (const [teamName, ids] of Object.entries(teams)) {
+    if (ids.includes(entryId)) return teamName;
+  }
+  return undefined;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const leagueId = searchParams.get('leagueId') || '314';
@@ -103,7 +117,7 @@ export async function GET(request: NextRequest) {
   const gw = searchParams.get('gw') || '0';
 
   try {
-    const { currentEvent, elements } = await getBootstrapData();
+    const { currentEvent, elements, teams } = await getBootstrapData();
     const eventID = gw && parseInt(gw) > 0 ? parseInt(gw) : currentEvent;
 
     const liveData = await getElementLiveByEventId(eventID);
@@ -133,6 +147,8 @@ export async function GET(request: NextRequest) {
         const picksWithLive = picksData.picks.map((pick: any) => {
           let live = null;
           let elementName: string | undefined = undefined;
+          let avatar: string | undefined = undefined;
+          let clubName: string | undefined = undefined;
           if (liveData) {
             live =
               liveData.elements.find((el: any) => el.id === pick.element) ||
@@ -141,8 +157,18 @@ export async function GET(request: NextRequest) {
           if (elements) {
             const player = elements.find((el: any) => el.id === pick.element);
             elementName = player ? player.web_name : undefined;
+            avatar = player ? `${player.code}.png` : undefined;
+            const team = teams.find((t: any) => t.id === player.team);
+            clubName = team ? team.name : undefined;
           }
-          return { ...pick, liveData: live, elementName };
+
+          return {
+            ...pick,
+            liveData: live,
+            elementName,
+            avatar,
+            clubName,
+          };
         });
 
         const picksDataWithLive = {
@@ -183,6 +209,7 @@ export async function GET(request: NextRequest) {
         let gwPoint = picksData.entry_history?.points ?? entry.gw;
         let transferCost = picksData.entry_history?.event_transfers_cost ?? 0;
         gwPoint = gwPoint - transferCost;
+        const team = getTeamByEntryId(entry.entry);
 
         return {
           rank: entry.rank,
@@ -192,6 +219,7 @@ export async function GET(request: NextRequest) {
           entry: entry.entry,
           picksData: picksDataWithLive,
           gwPoint: gwPoint,
+          team,
           // Chỉ thêm thông tin transfers nếu có
           ...(transfersWithNames.length > 0 && {
             transfers: transfersWithNames,

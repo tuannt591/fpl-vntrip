@@ -6,12 +6,6 @@ import { Skeleton } from "./ui/skeleton";
 import { ManagerAccordionList } from './ui/manager-accordion-list';
 import { LeaderboardEntry, TeamConfig, TeamStats } from '@/types/fantasy';
 
-interface FantasyLeaderboardProps {
-  leagueId?: string;
-  pageId?: number;
-  phase?: number;
-}
-
 // Constants
 const VNTRIP_LEAGUE_ID = "1405297";
 const CURRENT_PHASE = 1;
@@ -62,17 +56,17 @@ const TEAMS: TeamConfig[] = [
   {
     name: "87 Team",
     entries: [2195023, 6293111, 6291846],
-    color: "bg-blue-500"
+    color: "text-red-500"
   },
   {
     name: "89 Team",
     entries: [4565469, 4550400, 5005626],
-    color: "bg-green-500"
+    color: "text-violet-500"
   },
   {
     name: "3T Team",
     entries: [6400474, 3024127, 6425684],
-    color: "bg-purple-500"
+    color: "text-amber-500"
   }
 ];
 
@@ -100,10 +94,11 @@ const calculateTeamStats = (entries: LeaderboardEntry[]): TeamStats[] => {
 const ManagersSkeleton = () => (
   <>
     {Array.from({ length: 9 }).map((_, index) => (
-      <div className='flex items-center gap-1 p-2' key={index}>
+      <div className='flex items-center gap-2 p-2' key={index}>
+        <Skeleton className="h-6 w-10" />
         <Skeleton className="h-6 w-10" />
         <Skeleton className="h-6 flex-1" />
-        <Skeleton className="h-6 w-[6rem] px-1" style={{ width: 'calc(100% - 12rem)' }} />
+        <Skeleton className="h-6 w-[6rem] px-1" style={{ width: 'calc(100% - 14.5rem)' }} />
         <Skeleton className="h-6 w-10" />
         <div className="h-6 w-4" />
       </div>
@@ -111,11 +106,7 @@ const ManagersSkeleton = () => (
   </>
 );
 
-export const FantasyLeaderboard = ({
-  leagueId = VNTRIP_LEAGUE_ID,
-  pageId = 1,
-  phase = 1
-}: FantasyLeaderboardProps) => {
+export const FantasyLeaderboard = () => {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [teamStats, setTeamStats] = useState<TeamStats[]>([]);
   const [currentGW, setCurrentGW] = useState<number>(0);
@@ -164,7 +155,7 @@ export const FantasyLeaderboard = ({
   }, [mounted, currentLeagueId, reloadKey, selectedGW]);
 
   return (
-    <div className="container mx-auto py-4 sm:py-8">
+    <div className="container mx-auto py-4 px-2">
       <Card className='border-none shadow-none bg-transparent'>
         <CardHeader className='px-0 pt-0'>
           <div className="flex items-center justify-between gap-2">
@@ -212,10 +203,10 @@ export const FantasyLeaderboard = ({
                   {teamStats.map((team, index) => (
                     <Card key={index} className='bg-gray-100 dark:bg-gray-800'>
                       <CardHeader className='p-2'>
-                        <CardTitle className="text-lg text-center">{team.name}</CardTitle>
+                        <CardTitle className={`text-lg text-center ${team.color}`}>{team.name}</CardTitle>
                       </CardHeader>
                       <CardContent className="pt-0 pb-2">
-                        <p className="font-mono text-2xl font-extrabold text-green-700 text-center">{team.totalPoints.toLocaleString()}</p>
+                        <p className="font-mono text-2xl font-extrabold text-center">{team.totalPoints.toLocaleString()}</p>
                       </CardContent>
                     </Card>
                   ))}
@@ -226,9 +217,10 @@ export const FantasyLeaderboard = ({
             <div className="relative">
               {/* Sticky Header */}
               <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 shadow-sm rounded-t-md">
-                <div className="flex p-2 font-semibold text-sm border-b">
+                <div className="flex gap-2 p-2 font-semibold text-sm border-b">
                   <div className="w-10">Rank</div>
-                  <div className='px-1' style={{ width: 'calc(100% - 12rem)' }}>Manager</div>
+                  <div className="w-10 text-center">Team</div>
+                  <div className='px-2' style={{ width: 'calc(100% - 14.5rem)' }}>Manager</div>
                   <div className="w-[6rem] text-center">(C)</div>
                   <div className="w-10 text-center">GW</div>
                   <div className="w-4">&nbsp;</div>

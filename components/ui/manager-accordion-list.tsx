@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import Image from "next/image";
 import { LeaderboardEntry } from "@/types/fantasy";
 
 interface ManagerAccordionListProps {
@@ -32,11 +33,11 @@ export const ManagerAccordionList = ({
     );
   }
 
-  function getPositionText(position: number) {
+  function getElementType(elementType: number) {
     switch (true) {
-      case position <= 2: return "Thủ môn";
-      case position <= 7: return "Hậu vệ";
-      case position <= 12: return "Tiền vệ";
+      case elementType === 1: return "Thủ môn";
+      case elementType === 2: return "Hậu vệ";
+      case elementType === 3: return "Tiền vệ";
       default: return "Tiền đạo";
     }
   }
@@ -44,7 +45,7 @@ export const ManagerAccordionList = ({
   // Hàm render dialog chi tiết player
   function renderPlayerDialog() {
     if (!selectedPlayer) return null;
-    const { elementName, liveData, multiplier, is_captain, is_vice_captain, position, teamName } = selectedPlayer;
+    const { elementName, liveData, multiplier, is_captain, is_vice_captain, position, clubName, element_type, avatar } = selectedPlayer;
     const stats = liveData?.stats || {};
 
     // Icon cho từng chỉ số
@@ -53,14 +54,12 @@ export const ManagerAccordionList = ({
       minutes: "⏱️",
       goals_scored: "⚽",
       assists: "🅰️",
+      bonus: "🎁",
       yellow_cards: "🟨",
       red_cards: "🟥",
       clean_sheets: "🧤",
       saves: "🛡️",
       own_goals: "🥅",
-      subbed_out: "🔄",
-      goals_conceded: "🚨",
-      bonus: "🎁",
     };
 
     // Danh sách chỉ số hiển thị
@@ -69,65 +68,88 @@ export const ManagerAccordionList = ({
       { key: "minutes", label: "Phút thi đấu", value: stats.minutes ?? "-" },
       { key: "goals_scored", label: "Bàn thắng", value: stats.goals_scored ?? 0 },
       { key: "assists", label: "Kiến tạo", value: stats.assists ?? 0 },
+      { key: "bonus", label: "Bonus", value: stats.bonus ?? 0 },
       { key: "yellow_cards", label: "Thẻ vàng", value: stats.yellow_cards ?? 0 },
       { key: "red_cards", label: "Thẻ đỏ", value: stats.red_cards ?? 0 },
-      { key: "clean_sheets", label: "Giữ sạch lưới", value: stats.clean_sheets ?? 0 },
+      { key: "clean_sheets", label: "Sạch lưới", value: stats.clean_sheets ?? 0 },
       { key: "saves", label: "Cản phá", value: stats.saves ?? 0 },
       { key: "own_goals", label: "Phản lưới", value: stats.own_goals ?? 0 },
-      { key: "subbed_out", label: "Bị thay ra", value: stats.subbed_out ?? 0 },
-      { key: "goals_conceded", label: "Thủng lưới", value: stats.goals_conceded ?? 0 },
-      { key: "bonus", label: "Bonus", value: stats.bonus ?? 0 },
     ];
 
     return (
       <Dialog open={!!selectedPlayer} onOpenChange={() => setSelectedPlayer(null)}>
-        <DialogContent className="dark:bg-gray-900 bg-white max-w-lg rounded-xl shadow-2xl border-2 border-blue-200 dark:border-blue-900">
-          <DialogHeader>
-            <div className="flex items-center gap-4 mb-2">
-              <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-blue-400 to-green-400 flex items-center justify-center text-3xl font-bold text-white shadow-lg">
-                {elementName?.charAt(0)}
-              </div>
-              <div>
-                <DialogTitle className="text-2xl font-extrabold text-blue-700 dark:text-blue-200">{elementName}</DialogTitle>
-                <div className="text-xs text-muted-foreground">{teamName || ""}</div>
-                <div className="flex gap-2 mt-1">
-                  <span className="px-2 py-1 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 text-xs font-semibold">
-                    {getPositionText(position)}
-                  </span>
-                  {is_captain && (
-                    <span className="px-2 py-1 rounded bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200 text-xs font-semibold">
-                      Captain
-                    </span>
-                  )}
-                  {is_vice_captain && (
-                    <span className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-xs font-semibold">
-                      Vice Captain
-                    </span>
-                  )}
-                  <span className="px-2 py-1 rounded bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200 text-xs font-semibold">
-                    x{multiplier}
-                  </span>
+        <DialogContent className="dark:bg-gray-900 bg-white max-w-lg rounded-xl shadow-2xl border-2 border-blue-200 dark:border-blue-900 p-2">
+          <div className="flex flex-col gap-1 items-center justify-center">
+            <div>
+              {avatar ? (
+                <Image
+                  src={`https://resources.premierleague.com/premierleague25/photos/players/110x140/${avatar}`}
+                  alt={elementName}
+                  width={80}
+                  height={100}
+                  className="w-[5rem] h-auto"
+                  unoptimized // Nếu ảnh ngoài domain Next.js, dùng unoptimized hoặc cấu hình domains trong next.config.js
+                />
+              ) : (
+                <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-blue-400 to-green-400 flex items-center justify-center text-3xl font-bold text-white shadow-lg">
+                  {elementName?.charAt(0)}
                 </div>
-              </div>
+              )}
             </div>
-            <DialogDescription>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
-                {statList.map(stat => (
-                  <div
-                    key={stat.key}
-                    className="flex flex-col items-center bg-gray-50 dark:bg-gray-800 rounded-lg p-2 shadow-sm hover:scale-105 transition-transform"
-                  >
-                    <span className="text-xl mb-1">{statIcons[stat.key]}</span>
-                    <span className="font-bold text-base text-blue-700 dark:text-blue-200">{stat.value}</span>
-                    <span className="text-xs text-muted-foreground">{stat.label}</span>
-                  </div>
-                ))}
+
+            <div className="text-xl font-extrabold text-blue-700 dark:text-blue-200">
+              {elementName}
+            </div>
+
+            <div className="text-xs text-muted-foreground">{clubName || ""}</div>
+
+            <div className="flex gap-2">
+              <span className="px-2 py-1 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 text-xs font-semibold">
+                {getElementType(element_type)}
+              </span>
+              {is_captain && (
+                <span className="px-2 py-1 rounded bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200 text-xs font-semibold">
+                  Captain
+                </span>
+              )}
+              {is_vice_captain && (
+                <span className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-xs font-semibold">
+                  Vice Captain
+                </span>
+              )}
+              <span className="px-2 py-1 rounded bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200 text-xs font-semibold">
+                x{multiplier}
+              </span>
+            </div>
+          </div>
+          <div className="grid grid-cols-5 gap-2">
+            {statList.map(stat => (
+              <div
+                key={stat.key}
+                className="flex flex-col items-center bg-gray-50 dark:bg-gray-800 rounded-lg py-2 shadow-sm hover:scale-105 transition-transform"
+              >
+                <span className="text-xs">{statIcons[stat.key]}</span>
+                <span className="font-bold text-base text-blue-700 dark:text-blue-200">{stat.value}</span>
+                <span className="text-xs text-muted-foreground">{stat.label}</span>
               </div>
-            </DialogDescription>
-          </DialogHeader>
+            ))}
+          </div>
         </DialogContent>
       </Dialog>
     );
+  }
+
+  const getColorByTeam = (team: string | undefined) => {
+    switch (team) {
+      case '87':
+        return 'text-red-500';
+      case '89':
+        return 'text-violet-500';
+      case '3T':
+        return 'text-amber-500';
+      default:
+        return 'text-gray-500';
+    }
   }
 
   return (
@@ -146,14 +168,20 @@ export const ManagerAccordionList = ({
           const transferCost = entry.picksData?.entry_history?.event_transfers_cost;
           return (
             <AccordionItem key={entry.entry} value={entry.entry.toString()} className="border-0 my-2 px-2 bg-gray-100 dark:bg-gray-800">
-              <AccordionTrigger className="flex py-3 items-baseline rounded cursor-pointer text-sm gap-0 w-full">
+              <AccordionTrigger className="flex py-3 items-baseline rounded cursor-pointer text-sm gap-2 w-full">
                 {/* ---------------------rank----------------------- */}
                 <div className="w-10 text-center">
                   <p>{entry.rank}</p>
                 </div>
 
+                {/* ---------------------team----------------------- */}
+                <div className={`w-10 text-center ${getColorByTeam(entry.team)}`}>
+                  <p>{entry.team}</p>
+                  <p className="text-xs">Team</p>
+                </div>
+
                 {/* ---------------------manager----------------------- */}
-                <div className="text-left px-1" style={{ width: 'calc(100% - 12rem)' }}>
+                <div className="text-left px-2" style={{ width: 'calc(100% - 14.5rem)' }}>
                   <p className="truncate">{entry.teamName}</p>
                   <p className="text-muted-foreground truncate text-xs flex items-center gap-1">
                     {entry.manager}
@@ -199,7 +227,7 @@ export const ManagerAccordionList = ({
                   </div>
                 )}
               </div>
-              <AccordionContent className="py-4">
+              <AccordionContent className="py-2">
                 {entry.picksData ? (
                   <div className="flex flex-col gap-1">
                     {entry.picksData.picks
