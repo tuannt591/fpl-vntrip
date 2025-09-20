@@ -214,6 +214,15 @@ export const ManagerAccordionList = ({
                 {/* Hiển thị chip nếu có */}
                 {renderActiveChip(entry.picksData?.active_chip)}
 
+                {/* Hiển thị played */}
+                {entry.played && (
+                  <div className="flex items-center gap-1 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded-full text-xs">
+                    <span className="font-bold">Played&nbsp;</span>
+                    {entry.played}
+                  </div>
+                )}
+
+
                 {/* Hiển thị transfer nếu có */}
                 {entry?.transfers && entry?.transfers.length > 0 && (
                   <div className="flex flex-wrap gap-1 items-center text-xs">

@@ -108,6 +108,53 @@ function getTeamByEntryId(entryId: number): string | undefined {
   }
   return undefined;
 }
+//
+
+// Đếm số cầu thủ ra sân
+function calculatePlayed(picks: any[], liveData: any, activeChip?: string) {
+  let played = 0;
+
+  const starters = picks.filter((p: any) => p.position <= 11);
+  const captain = picks.find((p: any) => p.is_captain);
+  const viceCaptain = picks.find((p: any) => p.is_vice_captain);
+
+  const isTripleCaptain = activeChip === '3xc'; // chip triple captain
+
+  starters.forEach(pick => {
+    const playerLive = liveData.elements.find(
+      (el: any) => el.id === pick.element
+    );
+    const minutes = playerLive?.stats?.minutes ?? 0;
+
+    if (minutes > 0) {
+      played += 1;
+      if (pick.is_captain) {
+        // Captain tính thêm slot nhân đôi / nhân ba
+        played += isTripleCaptain ? 2 : 1;
+      }
+    }
+  });
+
+  // Nếu captain không ra sân -> VC sẽ thay
+  if (captain) {
+    const capLive = liveData.elements.find(
+      (el: any) => el.id === captain.element
+    );
+    const capMinutes = capLive?.stats?.minutes ?? 0;
+    if (capMinutes === 0 && viceCaptain) {
+      const viceLive = liveData.elements.find(
+        (el: any) => el.id === viceCaptain.element
+      );
+      const viceMinutes = viceLive?.stats?.minutes ?? 0;
+      if (viceMinutes > 0) {
+        played += isTripleCaptain ? 3 : 2; // VC sẽ nhận multiplier thay captain
+      }
+    }
+  }
+
+  const totalSlots = 11 + (isTripleCaptain ? 2 : 1);
+  return `${played}/${totalSlots}`;
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -149,6 +196,7 @@ export async function GET(request: NextRequest) {
           let elementName: string | undefined = undefined;
           let avatar: string | undefined = undefined;
           let clubName: string | undefined = undefined;
+
           if (liveData) {
             live =
               liveData.elements.find((el: any) => el.id === pick.element) ||
@@ -205,11 +253,120 @@ export async function GET(request: NextRequest) {
           });
         }
 
-        // Tính điểm GW thực tế
-        let gwPoint = picksData.entry_history?.points ?? entry.gw;
+        // 👉 Auto Sub Logic
+        function getPosition(elementId: number) {
+          const player = elements.find((el: any) => el.id === elementId);
+          // element_type: 1=GK, 2=DEF, 3=MID, 4=FWD
+          return player?.element_type;
+        }
+
+        function isGoalkeeper(elementId: number) {
+          return getPosition(elementId) === 1;
+        }
+
+        function isValidFormation(
+          startingXI: any[],
+          outPlayer: any,
+          inPlayer: any
+        ) {
+          let counts = { GK: 0, DEF: 0, MID: 0, FWD: 0 };
+
+          startingXI.forEach(p => {
+            if (p.element !== outPlayer.element) {
+              const pos = getPosition(p.element);
+              if (pos === 1) counts.GK++;
+              if (pos === 2) counts.DEF++;
+              if (pos === 3) counts.MID++;
+              if (pos === 4) counts.FWD++;
+            }
+          });
+
+          // Thêm inPlayer
+          const inPos = getPosition(inPlayer.element);
+          if (inPos === 1) counts.GK++;
+          if (inPos === 2) counts.DEF++;
+          if (inPos === 3) counts.MID++;
+          if (inPos === 4) counts.FWD++;
+
+          return (
+            counts.GK === 1 &&
+            counts.DEF >= 3 &&
+            counts.MID >= 2 &&
+            counts.FWD >= 1 &&
+            counts.GK + counts.DEF + counts.MID + counts.FWD === 11
+          );
+        }
+
+        function replacePlayer(
+          startingXI: any[],
+          outPlayer: any,
+          inPlayer: any
+        ) {
+          const index = startingXI.findIndex(
+            p => p.element === outPlayer.element
+          );
+          if (index !== -1) {
+            console.log(
+              `[AutoSub][${entry.entry_name}]`,
+              `OUT: ${outPlayer.elementName} (${outPlayer.element})`,
+              `=> IN: ${inPlayer.elementName} (${inPlayer.element})`
+            );
+            startingXI[index] = inPlayer;
+          }
+        }
+
+        function applyAutoSub(picks: any[]) {
+          let startingXI = picks.filter(p => p.position <= 11);
+          let bench = picks
+            .filter(p => p.position > 11)
+            .sort((a, b) => a.position - b.position);
+
+          for (let player of [...startingXI]) {
+            const minutes = player.liveData?.stats?.minutes ?? 0;
+
+            if (minutes === 0) {
+              if (isGoalkeeper(player.element)) {
+                const subGK = bench.find(b => isGoalkeeper(b.element));
+                const subGKMinutes = subGK?.liveData?.stats?.minutes ?? 0;
+                if (subGK && subGKMinutes > 0) {
+                  replacePlayer(startingXI, player, subGK);
+                }
+              } else {
+                for (let sub of bench) {
+                  const subMinutes = sub.liveData?.stats?.minutes ?? 0;
+                  if (
+                    subMinutes > 0 &&
+                    isValidFormation(startingXI, player, sub)
+                  ) {
+                    replacePlayer(startingXI, player, sub);
+                    break;
+                  }
+                }
+              }
+            }
+          }
+          return startingXI;
+        }
+
+        // Áp dụng autosub
+        const startingXI = applyAutoSub(picksWithLive);
+
+        // 👉 Tính điểm GW thực tế từ 11 cầu thủ sau autosub
+        let gwPoint = startingXI.reduce((sum: number, pick: any) => {
+          const playerPoints = pick.liveData?.stats?.total_points ?? 0;
+          return sum + playerPoints * pick.multiplier;
+        }, 0);
+
+        // Trừ điểm trừ chuyển nhượng
         let transferCost = picksData.entry_history?.event_transfers_cost ?? 0;
         gwPoint = gwPoint - transferCost;
+
         const team = getTeamByEntryId(entry.entry);
+        const played = calculatePlayed(
+          picksDataWithLive.picks,
+          liveData,
+          picksData.active_chip
+        );
 
         return {
           rank: entry.rank,
@@ -218,15 +375,23 @@ export async function GET(request: NextRequest) {
           totalPoint: entry.total,
           entry: entry.entry,
           picksData: picksDataWithLive,
-          gwPoint: gwPoint,
+          gwPoint,
           team,
-          // Chỉ thêm thông tin transfers nếu có
+          played,
           ...(transfersWithNames.length > 0 && {
             transfers: transfersWithNames,
           }),
         };
       })
     );
+
+    entriesWithPicks = entriesWithPicks
+      .sort((a, b) => b.gwPoint - a.gwPoint)
+      .map((entry, idx) => ({ ...entry, rank: idx + 1 }));
+
+    entriesWithPicks = entriesWithPicks
+      .sort((a, b) => b.gwPoint - a.gwPoint)
+      .map((entry, idx) => ({ ...entry, rank: idx + 1 }));
 
     entriesWithPicks = entriesWithPicks
       .sort((a, b) => b.gwPoint - a.gwPoint)

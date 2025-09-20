@@ -137,6 +137,7 @@ export const FantasyLeaderboard = () => {
 
       try {
         const result = await fetchFantasyVntripData(currentLeagueId, CURRENT_PHASE, selectedGW);
+        console.log('----result----', result);
 
         setLeaderboardData(result.entries);
         setCurrentGW(result.currentGW);
