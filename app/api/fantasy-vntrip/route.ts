@@ -473,14 +473,6 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.gwPoint - a.gwPoint)
       .map((entry, idx) => ({ ...entry, rank: idx + 1 }));
 
-    entriesWithPicks = entriesWithPicks
-      .sort((a, b) => b.gwPoint - a.gwPoint)
-      .map((entry, idx) => ({ ...entry, rank: idx + 1 }));
-
-    entriesWithPicks = entriesWithPicks
-      .sort((a, b) => b.gwPoint - a.gwPoint)
-      .map((entry, idx) => ({ ...entry, rank: idx + 1 }));
-
     // Add current gameweek to the response
     const enhancedData = {
       entries: entriesWithPicks,
