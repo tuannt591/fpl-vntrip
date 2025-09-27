@@ -13,7 +13,7 @@ export const ManagerAccordionList = ({
   managers,
 }: ManagerAccordionListProps) => {
   const [selectedPlayer, setSelectedPlayer] = useState<any | null>(null);
-
+  const [openItems, setOpenItems] = useState<string[]>([]);
 
   const CHIP_CONFIG: Record<string, { label: string; variant: "secondary" | "destructive" | "default" | "outline" | "success" | "warning" }> = {
     wildcard: { label: "WC", variant: "destructive" },
@@ -160,14 +160,20 @@ export const ManagerAccordionList = ({
         // collapsible
         // value={open}
         // onValueChange={setOpen}
-        className="divide-y"
+        value={openItems}
+        onValueChange={(val) => setOpenItems(val as string[])}
       >
         {managers.map((entry) => {
           const captain = entry.picksData?.picks.find(p => p.is_captain);
           const viceCaptain = entry.picksData?.picks.find(p => p.is_vice_captain);
           const transferCost = entry.picksData?.entry_history?.event_transfers_cost;
+          const isOpen = openItems.includes(entry.entry.toString());
+
           return (
-            <AccordionItem key={entry.entry} value={entry.entry.toString()} className="border-0 my-2 px-2 bg-gray-100 dark:bg-gray-800">
+            <AccordionItem key={entry.entry} value={entry.entry.toString()} className={`border-2 my-2 px-2 bg-gray-100 dark:bg-gray-800 ${isOpen
+              ? "border-blue-500 dark:border-blue-400"
+              : "border-transparent"
+              }`}>
               <AccordionTrigger className="flex py-3 items-baseline rounded cursor-pointer text-sm gap-2 w-full">
                 {/* ---------------------rank----------------------- */}
                 <div className="w-10 text-center">
