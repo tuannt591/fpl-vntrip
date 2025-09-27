@@ -49,6 +49,28 @@ async function getElementLiveByEventId(eventId: number): Promise<any> {
   return null;
 }
 
+async function getFixturesByEventId(eventId: number): Promise<any> {
+  try {
+    const response = await fetch(
+      `https://fantasy.premierleague.com/api/fixtures/?event=${eventId}`,
+      {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+      }
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      return calculateBonus(data);
+    }
+  } catch (error) {
+    console.error('Error fetching element live data:', error);
+  }
+  return null;
+}
+
 async function getPicksByEntryId(
   entryId: number,
   eventId: number
@@ -94,6 +116,48 @@ async function getTransferByEntryId(entryId: number): Promise<any> {
     console.error('Error fetching picks data:', error);
   }
   return null;
+}
+
+function calculateBonus(fixtures: any[]) {
+  return fixtures.map(fixture => {
+    const bpsStat = fixture.stats.find((s: any) => s.identifier === 'bps');
+    if (!bpsStat) {
+      return { fixtureId: fixture.id, bonus: {} };
+    }
+
+    // Gom tất cả BPS từ home và away
+    const allBps = [...bpsStat.a, ...bpsStat.h];
+
+    // Sort giảm dần theo value
+    allBps.sort((a, b) => b.value - a.value);
+
+    const bonusMap: Record<number, number> = {};
+
+    let currentRank = 1;
+    let i = 0;
+
+    while (i < allBps.length && currentRank <= 3) {
+      const sameScoreGroup = allBps.filter(p => p.value === allBps[i].value);
+      let bonus = 0;
+      if (currentRank === 1) bonus = 3;
+      else if (currentRank === 2) bonus = 2;
+      else if (currentRank === 3) bonus = 1;
+
+      sameScoreGroup.forEach(p => {
+        bonusMap[p.element] = (bonusMap[p.element] || 0) + bonus;
+      });
+
+      i += sameScoreGroup.length;
+      currentRank += sameScoreGroup.length;
+    }
+
+    return {
+      fixtureId: fixture.id,
+      finished_provisional: fixture.finished_provisional,
+      minutes: fixture.minutes,
+      bonus: bonusMap,
+    };
+  });
 }
 
 // Thêm hàm xác định team theo entryId
@@ -168,6 +232,7 @@ export async function GET(request: NextRequest) {
     const eventID = gw && parseInt(gw) > 0 ? parseInt(gw) : currentEvent;
 
     const liveData = await getElementLiveByEventId(eventID);
+    const fixtureData = await getFixturesByEventId(eventID);
 
     const response = await fetch(
       `https://fantasy.premierleague.com/api/leagues-classic/${leagueId}/standings/?page_standings=1&phase=${phase}`,
@@ -191,6 +256,7 @@ export async function GET(request: NextRequest) {
       leagueData.standings.results.map(async (entry: any) => {
         const picksData = await getPicksByEntryId(entry.entry, eventID);
 
+        // 1. Tạo picksWithLive (chỉ lấy liveData, player info, chưa merge bonus)
         const picksWithLive = picksData.picks.map((pick: any) => {
           let live = null;
           let elementName: string | undefined = undefined;
@@ -219,9 +285,50 @@ export async function GET(request: NextRequest) {
           };
         });
 
+        // 2. Merge bonus vào explain (sau khi fixtureData có sẵn)
+        const picksWithBonus = picksWithLive.map((pick: any) => {
+          const live = pick.liveData;
+          if (live && Array.isArray(live.explain)) {
+            live.explain = live.explain.map((exp: any) => {
+              const fixtureBonus = fixtureData.find(
+                (b: any) => b.fixtureId === exp.fixture
+              );
+
+              if (fixtureBonus) {
+                const bonusPoints = fixtureBonus.bonus[live.id];
+
+                if (bonusPoints) {
+                  const hasBonus = exp.stats.some(
+                    (s: any) => s.identifier === 'bonus'
+                  );
+
+                  if (!hasBonus) {
+                    return {
+                      ...exp,
+                      stats: [
+                        ...exp.stats,
+                        {
+                          identifier: 'bonus',
+                          points: bonusPoints,
+                          value: bonusPoints,
+                          points_modification: 0,
+                        },
+                      ],
+                    };
+                  }
+                }
+              }
+
+              return exp; // không có bonus thì giữ nguyên
+            });
+          }
+
+          return pick;
+        });
+
         const picksDataWithLive = {
           ...picksData,
-          picks: picksWithLive,
+          picks: picksWithBonus,
         };
 
         // Kiểm tra chip và số transfer
@@ -429,15 +536,35 @@ export async function GET(request: NextRequest) {
 
         // Áp dụng autosub
         const picksWithAutoSubs = applyAutoSub(
-          picksWithLive,
+          picksWithBonus,
           picksData.active_chip
         );
 
         // 👉 Tính điểm GW thực tế từ 11 cầu thủ sau autosub
-        let gwPoint = picksWithLive
+        // let gwPoint = picksWithLive
+        //   .filter((pick: any) => pick.position <= 11) // chỉ lấy 11 cầu thủ chính
+        //   .reduce((sum: number, pick: any) => {
+        //     const playerPoints = pick.liveData?.stats?.total_points ?? 0;
+        //     return sum + playerPoints * pick.multiplier;
+        //   }, 0);
+
+        let gwPoint = picksWithBonus
           .filter((pick: any) => pick.position <= 11) // chỉ lấy 11 cầu thủ chính
           .reduce((sum: number, pick: any) => {
-            const playerPoints = pick.liveData?.stats?.total_points ?? 0;
+            const explain = pick.liveData?.explain ?? [];
+
+            // Tính tổng điểm từ explain
+            const playerPoints = explain.reduce(
+              (playerSum: number, exp: any) => {
+                const fixturePoints = exp.stats.reduce(
+                  (statSum: number, s: any) => statSum + (s.points ?? 0),
+                  0
+                );
+                return playerSum + fixturePoints;
+              },
+              0
+            );
+
             return sum + playerPoints * pick.multiplier;
           }, 0);
 
@@ -478,6 +605,7 @@ export async function GET(request: NextRequest) {
       entries: entriesWithPicks,
       leagueName: leagueData?.league.name || 'Unknown League',
       currentGW: currentEvent,
+      fixtureData,
     };
 
     return NextResponse.json(enhancedData, {

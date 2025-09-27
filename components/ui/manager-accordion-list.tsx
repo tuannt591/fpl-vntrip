@@ -249,6 +249,7 @@ export const ManagerAccordionList = ({
                       .sort((a, b) => a.position - b.position)
                       .map((pick) => {
                         const minutes = pick.liveData?.stats?.minutes ?? '-';
+                        const point = pick.position > 11 ? (pick.liveData?.stats.total_points || 0) : (pick.liveData?.stats.total_points || 0) * pick.multiplier;
                         return (
                           <div
                             key={pick.position}
@@ -261,8 +262,8 @@ export const ManagerAccordionList = ({
                               {pick.is_vice_captain && <span className="text-muted-foreground">(VC)</span>}
                               {/* <span className="text-muted-foreground"> - {minutes}&apos;</span> */}
                             </span>
-                            <span className="font-mono text-green-700 font-semibold text-sm">
-                              {pick.position > 11 ? (pick.liveData?.stats.total_points || 0) : (pick.liveData?.stats.total_points || 0) * pick.multiplier}
+                            <span className={`font-mono font-semibold text-sm ${point >= 0 ? 'text-green-700' : 'text-red-500'}`}>
+                              {point}
                             </span>
                           </div>
                         )
@@ -275,7 +276,7 @@ export const ManagerAccordionList = ({
             </AccordionItem>
           );
         })}
-      </Accordion>
+      </Accordion >
     </>
   );
 };
