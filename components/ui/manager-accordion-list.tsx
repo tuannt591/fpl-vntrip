@@ -17,9 +17,9 @@ export const ManagerAccordionList = ({
 
   const CHIP_CONFIG: Record<string, { label: string; variant: "secondary" | "destructive" | "default" | "outline" | "success" | "warning" }> = {
     wildcard: { label: "WC", variant: "destructive" },
-    freehit: { label: "FH", variant: "success" },
-    bench_boost: { label: "BB", variant: "warning" },
-    triple_captain: { label: "TC", variant: "default" },
+    freehit: { label: "FH", variant: "destructive" },
+    bboost: { label: "BB", variant: "destructive" },
+    '3xc': { label: "TC", variant: "destructive" },
   };
 
   function renderActiveChip(active_chip?: string | null) {
@@ -27,7 +27,7 @@ export const ManagerAccordionList = ({
     const chip = CHIP_CONFIG[active_chip];
     if (!chip) return null;
     return (
-      <Badge variant={chip.variant} className="text-xs font-normal px-1">
+      <Badge variant={chip.variant} className="text-xs font-normal px-2">
         {chip.label}
       </Badge>
     );
@@ -238,7 +238,7 @@ export const ManagerAccordionList = ({
               </div>
               <AccordionContent className="py-2">
                 {entry.picksData ? (
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-wrap gap-1">
                     {entry.picksData.picks
                       .sort((a, b) => a.position - b.position)
                       .map((pick) => {
@@ -253,9 +253,9 @@ export const ManagerAccordionList = ({
                               {pick.elementName}&nbsp;
                               {pick.is_captain && <span className="text-muted-foreground">(C)</span>}
                               {pick.is_vice_captain && <span className="text-muted-foreground">(VC)</span>}
-                              <span className="text-muted-foreground"> - {minutes}&apos;</span>
+                              {/* <span className="text-muted-foreground"> - {minutes}&apos;</span> */}
                             </span>
-                            <span className="font-mono text-green-700 font-semibold">
+                            <span className="font-mono text-green-700 font-semibold text-sm">
                               {pick.position > 11 ? (pick.liveData?.stats.total_points || 0) : (pick.liveData?.stats.total_points || 0) * pick.multiplier}
                             </span>
                           </div>
