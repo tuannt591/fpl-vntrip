@@ -4,6 +4,8 @@ export type Pick = {
   multiplier: number;
   is_captain: boolean;
   is_vice_captain: boolean;
+  stats: any;
+  explain: any[];
 };
 
 export type LivePlayerData = {
@@ -78,10 +80,12 @@ export type LeaderboardEntry = {
   gwPoint: number;
   totalPoint: number;
   entry: number;
-  picksData?: PicksDataWithLive | null;
   transfers: Transfer[];
   team: string | undefined;
-  played: string;
+  playedInfo: any;
+  picks: PickWithLive[];
+  entryHistory: any;
+  activeChip: string;
 };
 
 export type TeamConfig = {
@@ -99,3 +103,13 @@ export type TeamStats = {
   memberCount: number;
   members: LeaderboardEntry[];
 };
+
+export enum PlayerMatchStatus {
+  NOT_STARTED = 'not_started', // Trận chưa bắt đầu
+  PLAYING = 'playing', // Đang thi đấu
+  PLAYED = 'played', // Đã thi đấu
+  SUBSTITUTE = 'substitute', // Dự bị (không ra sân)
+  // SUB_ON = 'sub_on', // Vào sân từ ghế dự bị
+  // SUB_OFF = 'sub_off', // Bị thay ra khỏi sân
+  UNKNOWN = 'unknown', // Không xác định
+}

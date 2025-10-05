@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import Image from "next/image";
-import { LeaderboardEntry } from "@/types/fantasy";
+import { LeaderboardEntry, PlayerMatchStatus } from "@/types/fantasy";
 
 interface ManagerAccordionListProps {
   managers: LeaderboardEntry[];
@@ -45,8 +45,7 @@ export const ManagerAccordionList = ({
   // Hàm render dialog chi tiết player
   function renderPlayerDialog() {
     if (!selectedPlayer) return null;
-    const { elementName, liveData, multiplier, is_captain, is_vice_captain, position, clubName, element_type, avatar } = selectedPlayer;
-    const stats = liveData?.stats || {};
+    const { elementName, stats, multiplier, is_captain, is_vice_captain, position, clubName, element_type, avatar } = selectedPlayer;
 
     // Icon cho từng chỉ số
     const statIcons: Record<string, string> = {
@@ -164,9 +163,9 @@ export const ManagerAccordionList = ({
         onValueChange={(val) => setOpenItems(val as string[])}
       >
         {managers.map((entry) => {
-          const captain = entry.picksData?.picks.find(p => p.is_captain);
-          const viceCaptain = entry.picksData?.picks.find(p => p.is_vice_captain);
-          const transferCost = entry.picksData?.entry_history?.event_transfers_cost;
+          const captain = entry?.picks.find(p => p.is_captain);
+          const viceCaptain = entry?.picks.find(p => p.is_vice_captain);
+          const transferCost = entry?.entryHistory?.transferCost;
           const isOpen = openItems.includes(entry.entry.toString());
 
           return (
@@ -211,20 +210,20 @@ export const ManagerAccordionList = ({
               {/* ---------------------detail info----------------------- */}
               <div className="flex items-center flex-wrap p-1 gap-1 border-t dark:border-gray-700">
                 {/* Hiển thị tiền bank nếu có */}
-                {entry.picksData?.entry_history?.bank !== undefined && (
+                {entry.entryHistory?.bank !== undefined && (
                   <p className="text-xs">
-                    💰{(entry.picksData.entry_history.value / 10).toFixed(1)}m
+                    💰{(entry.entryHistory.value / 10).toFixed(1)}m
                   </p>
                 )}
 
                 {/* Hiển thị chip nếu có */}
-                {renderActiveChip(entry.picksData?.active_chip)}
+                {renderActiveChip(entry.activeChip)}
 
                 {/* Hiển thị played */}
-                {entry.played && (
+                {entry.playedInfo && (
                   <div className="flex items-center gap-1 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded-full text-xs">
                     <span className="font-bold">Played&nbsp;</span>
-                    {entry.played}
+                    {entry.playedInfo.played}/{entry.playedInfo.total}
                   </div>
                 )}
 
@@ -243,13 +242,16 @@ export const ManagerAccordionList = ({
                 )}
               </div>
               <AccordionContent className="py-2">
-                {entry.picksData ? (
+                {entry.picks ? (
                   <div className="flex flex-wrap gap-1">
-                    {entry.picksData.picks
+                    {entry.picks
                       .sort((a, b) => a.position - b.position)
                       .map((pick) => {
-                        const minutes = pick.liveData?.stats?.minutes ?? '-';
-                        const point = pick.position > 11 ? (pick.liveData?.stats.total_points || 0) : (pick.liveData?.stats.total_points || 0) * pick.multiplier;
+                        const point = pick.position > 11 ? (pick?.stats.total_points || 0) : (pick?.stats.total_points || 0) * pick.multiplier;
+                        const allMatchesNotStarted = pick?.explain.every(
+                          (exp: any) => exp.match_status === PlayerMatchStatus.NOT_STARTED
+                        );
+
                         return (
                           <div
                             key={pick.position}
@@ -262,8 +264,8 @@ export const ManagerAccordionList = ({
                               {pick.is_vice_captain && <span className="text-muted-foreground">(VC)</span>}
                               {/* <span className="text-muted-foreground"> - {minutes}&apos;</span> */}
                             </span>
-                            <span className={`font-mono font-semibold text-sm ${point >= 0 ? 'text-green-700' : 'text-red-500'}`}>
-                              {point}
+                            <span className={`font-mono font-semibold text-sm ${allMatchesNotStarted ? 'text-orange-500' : point >= 0 ? 'text-green-700' : 'text-red-500'}`}>
+                              {allMatchesNotStarted ? <>--</> : point}
                             </span>
                           </div>
                         )
