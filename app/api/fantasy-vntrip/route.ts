@@ -417,7 +417,6 @@ export async function GET(request: NextRequest) {
           picksData
         );
 
-        // 1. Tạo picksWithLive (chỉ lấy liveData, player info, chưa merge bonus)
         const picksWithLive = picksData.picks.map((pick: any) => {
           let live = null;
           let elementName: string | undefined = undefined;
@@ -526,7 +525,6 @@ export async function GET(request: NextRequest) {
           teamName: entry.entry_name,
           totalPoint: entry.total,
           entry: entryId,
-          // picksData: picksDataWithLive,
           gwPoint,
           team,
           playedInfo,
