@@ -79,6 +79,10 @@ const calculateTeamStats = (entries: LeaderboardEntry[]): TeamStats[] => {
     const averagePoints = teamMembers.length > 0 ? Math.round(totalPoints / teamMembers.length) : 0;
     const bestRank = teamMembers.length > 0 ? Math.min(...teamMembers.map(member => member.rank)) : 0;
 
+    // Tính tổng số cầu thủ đã ra sân của team
+    const totalPlayed = teamMembers.reduce((sum, member) => sum + (member.playedInfo?.played ?? 0), 0);
+    const totalPlayedMax = teamMembers.reduce((sum, member) => sum + (member.playedInfo?.total ?? 0), 0);
+
     return {
       name: team.name,
       color: team.color,
@@ -86,7 +90,9 @@ const calculateTeamStats = (entries: LeaderboardEntry[]): TeamStats[] => {
       averagePoints,
       bestRank,
       memberCount: teamMembers.length,
-      members: teamMembers.sort((a, b) => a.rank - b.rank)
+      members: teamMembers.sort((a, b) => a.rank - b.rank),
+      totalPlayed,
+      totalPlayedMax,
     };
   }).sort((a, b) => b.averagePoints - a.averagePoints);
 };
@@ -208,6 +214,9 @@ export const FantasyLeaderboard = () => {
                       </CardHeader>
                       <CardContent className="pt-0 pb-2">
                         <p className="font-mono text-2xl font-extrabold text-center">{team.totalPoints.toLocaleString()}</p>
+                        <p className="text-xs text-center text-muted-foreground">
+                          Played: {team.totalPlayed}/{team.totalPlayedMax}
+                        </p>
                       </CardContent>
                     </Card>
                   ))}
@@ -218,12 +227,12 @@ export const FantasyLeaderboard = () => {
             <div className="relative">
               {/* Sticky Header */}
               <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 shadow-sm rounded-t-md">
-                <div className="flex gap-2 p-2 font-semibold text-sm border-b">
-                  <div className="w-10">Rank</div>
-                  <div className="w-10 text-center">Team</div>
-                  <div className='px-2' style={{ width: 'calc(100% - 14.5rem)' }}>Manager</div>
-                  <div className="w-[6rem] text-center">(C)</div>
-                  <div className="w-10 text-center">GW</div>
+                <div className="flex gap-1 sm:gap-2 p-2 font-semibold text-xs sm:text-sm border-b">
+                  <div className="w-6 sm:w-10 text-center">Rank</div>
+                  <div className="w-8 sm:w-10 text-center">Team</div>
+                  <div className='flex-1 min-w-0 px-1 sm:px-2'>Manager</div>
+                  <div className="w-14 sm:w-[5rem] md:w-[6rem] text-center">(C)</div>
+                  <div className="w-10 sm:w-12 text-center">GW</div>
                   <div className="w-4">&nbsp;</div>
                 </div>
               </div>

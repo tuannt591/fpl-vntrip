@@ -39,6 +39,7 @@ export type LivePlayerData = {
 export type PickWithLive = Pick & {
   liveData?: LivePlayerData | null;
   elementName?: string;
+  isAutoSubIn?: boolean;
 };
 
 export type PicksData = {
@@ -102,6 +103,8 @@ export type TeamStats = {
   bestRank: number;
   memberCount: number;
   members: LeaderboardEntry[];
+  totalPlayed: number;
+  totalPlayedMax: number;
 };
 
 export enum PlayerMatchStatus {

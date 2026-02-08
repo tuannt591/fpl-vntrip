@@ -173,42 +173,51 @@ export const ManagerAccordionList = ({
               ? "border-blue-500 dark:border-blue-400"
               : "border-transparent"
               }`}>
-              <AccordionTrigger className="flex py-3 items-baseline rounded cursor-pointer text-sm gap-2 w-full">
+              <AccordionTrigger className="flex py-2 sm:py-3 items-baseline rounded cursor-pointer text-xs sm:text-sm gap-1 sm:gap-2 w-full">
                 {/* ---------------------rank----------------------- */}
-                <div className="w-10 text-center">
+                <div className="w-6 sm:w-10 text-center">
                   <p>{entry.rank}</p>
                 </div>
 
                 {/* ---------------------team----------------------- */}
-                <div className={`w-10 text-center ${getColorByTeam(entry.team)}`}>
-                  <p>{entry.team}</p>
-                  <p className="text-xs">Team</p>
+                <div className={`w-8 sm:w-10 text-center ${getColorByTeam(entry.team)}`}>
+                  <p className="text-xs sm:text-sm">{entry.team}</p>
+                  <p className="text-[10px] sm:text-xs hidden sm:block">Team</p>
                 </div>
 
                 {/* ---------------------manager----------------------- */}
-                <div className="text-left px-2" style={{ width: 'calc(100% - 14.5rem)' }}>
-                  <p className="truncate">{entry.teamName}</p>
-                  <p className="text-muted-foreground truncate text-xs flex items-center gap-1">
+                <div className="flex-1 min-w-0 text-left px-1 sm:px-2">
+                  <p className="truncate text-xs sm:text-sm">{entry.teamName}</p>
+                  <p className="text-muted-foreground truncate text-[10px] sm:text-xs">
                     {entry.manager}
                   </p>
                 </div>
 
                 {/* ---------------------Captain----------------------- */}
-                <div className="w-[6rem] text-center">
-                  {captain && <p className="truncate">{captain?.elementName}</p>}
-                  {viceCaptain && <p className="text-muted-foreground text-xs truncate">{viceCaptain?.elementName}</p>}
+                <div className="w-14 sm:w-[5rem] md:w-[6rem] text-center">
+                  {captain && <p className="truncate text-[10px] sm:text-xs">{captain?.elementName}</p>}
+                  {viceCaptain && <p className="text-muted-foreground text-[9px] sm:text-[10px] truncate">{viceCaptain?.elementName}</p>}
                 </div>
 
                 {/* ---------------------GW----------------------- */}
-                <div className="w-10 text-center">
-                  <p className="font-semibold text-green-700 text-lg">{entry.gwPoint}</p>
-                  {transferCost ? <p className="text-xs font-medium text-red-500">(-{transferCost})</p> : null}
+                <div className="w-10 sm:w-12 text-center">
+                  <p className="font-semibold text-green-700 text-base sm:text-lg">{entry.gwPoint}</p>
+                  {transferCost ? <p className="text-[10px] sm:text-xs font-medium text-red-500">(-{transferCost})</p> : null}
                 </div>
 
               </AccordionTrigger>
 
-              {/* ---------------------detail info----------------------- */}
-              <div className="flex items-center flex-wrap p-1 gap-1 border-t dark:border-gray-700">
+              {/* ---------------------detail info (clickable to toggle)----------------------- */}
+              <div 
+                className="flex items-center flex-wrap p-1 gap-1 border-t dark:border-gray-700 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                onClick={() => {
+                  if (isOpen) {
+                    setOpenItems(openItems.filter(id => id !== entry.entry.toString()));
+                  } else {
+                    setOpenItems([...openItems, entry.entry.toString()]);
+                  }
+                }}
+              >
                 {/* Hiển thị tiền bank nếu có */}
                 {entry.entryHistory?.bank !== undefined && (
                   <p className="text-xs">
@@ -241,35 +250,87 @@ export const ManagerAccordionList = ({
                   </div>
                 )}
               </div>
-              <AccordionContent className="py-2">
+              <AccordionContent className="py-2" onClick={(e) => e.stopPropagation()}>
                 {entry.picks ? (
-                  <div className="flex flex-wrap gap-1">
-                    {entry.picks
-                      .sort((a, b) => a.position - b.position)
-                      .map((pick) => {
-                        const point = pick.position > 11 ? (pick?.stats.total_points || 0) : (pick?.stats.total_points || 0) * pick.multiplier;
-                        const allMatchesNotStarted = pick?.explain.every(
-                          (exp: any) => exp.match_status === PlayerMatchStatus.NOT_STARTED
-                        );
+                  <div className="space-y-2">
+                    {/* Starters (positions 1-11) */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1">
+                      {entry.picks
+                        .filter((p) => p.position <= 11)
+                        .sort((a, b) => a.position - b.position)
+                        .map((pick) => {
+                          const point = (pick?.stats.total_points || 0) * pick.multiplier;
+                          const allMatchesNotStarted = pick?.explain.every(
+                            (exp: any) => exp.match_status === PlayerMatchStatus.NOT_STARTED
+                          );
+                          const isAutoSubIn = pick.isAutoSubIn === true;
 
-                        return (
-                          <div
-                            key={pick.position}
-                            className={`cursor-pointer p-2 flex items-center gap-2 text-xs rounded-md border ${pick.position > 11 ? "bg-gray-100 dark:bg-gray-800 dark:border-gray-700" : "bg-white dark:bg-gray-900"}`}
-                            onClick={() => setSelectedPlayer(pick)}
-                          >
-                            <span className="flex-1 truncate text-black dark:text-white">
-                              {pick.elementName}&nbsp;
-                              {pick.is_captain && <span className="text-muted-foreground">(C)</span>}
-                              {pick.is_vice_captain && <span className="text-muted-foreground">(VC)</span>}
-                              {/* <span className="text-muted-foreground"> - {minutes}&apos;</span> */}
-                            </span>
-                            <span className={`font-mono font-semibold text-sm ${allMatchesNotStarted ? 'text-orange-500' : point >= 0 ? 'text-green-700' : 'text-red-500'}`}>
-                              {allMatchesNotStarted ? <>--</> : point}
-                            </span>
-                          </div>
-                        )
-                      })}
+                          return (
+                            <div
+                              key={pick.position}
+                              className={`cursor-pointer p-1.5 sm:p-2 flex items-center gap-1 sm:gap-2 text-xs rounded-md border shadow-sm transition-all duration-150 hover:scale-[1.02] hover:shadow-md active:scale-[0.98] ${
+                                isAutoSubIn
+                                  ? "bg-green-100 dark:bg-green-900/50 border-green-400 dark:border-green-600 ring-1 ring-green-300 dark:ring-green-700"
+                                  : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600"
+                              }`}
+                              onClick={() => setSelectedPlayer(pick)}
+                              title="Click để xem chi tiết"
+                            >
+                              <span className="flex-1 truncate text-black dark:text-white text-[11px] sm:text-xs font-medium">
+                                {isAutoSubIn && <span className="text-green-600 mr-0.5" title="Auto Sub">⬆️</span>}
+                                {pick.elementName}&nbsp;
+                                {pick.is_captain && <span className="text-yellow-600 font-bold">(C)</span>}
+                                {pick.is_vice_captain && <span className="text-muted-foreground">(VC)</span>}
+                              </span>
+                              <span className={`font-mono font-bold text-xs sm:text-sm ${allMatchesNotStarted ? 'text-orange-500' : point >= 0 ? 'text-green-700' : 'text-red-500'}`}>
+                                {allMatchesNotStarted ? <>--</> : point}
+                              </span>
+                            </div>
+                          )
+                        })}
+                    </div>
+
+                    {/* Separator */}
+                    <div className="flex items-center gap-2 px-1">
+                      <div className="flex-1 h-px bg-gray-300 dark:bg-gray-600"></div>
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Bench</span>
+                      <div className="flex-1 h-px bg-gray-300 dark:bg-gray-600"></div>
+                    </div>
+
+                    {/* Bench (positions 12-15) */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
+                      {entry.picks
+                        .filter((p) => p.position > 11)
+                        .sort((a, b) => a.position - b.position)
+                        .map((pick) => {
+                          const point = pick?.stats.total_points || 0;
+                          const allMatchesNotStarted = pick?.explain.every(
+                            (exp: any) => exp.match_status === PlayerMatchStatus.NOT_STARTED
+                          );
+                          const isAutoSubIn = pick.isAutoSubIn === true;
+
+                          return (
+                            <div
+                              key={pick.position}
+                              className={`cursor-pointer p-1 sm:p-1.5 flex items-center gap-1 text-xs rounded border transition-all duration-150 active:scale-[0.98] ${
+                                isAutoSubIn
+                                  ? "bg-green-100 dark:bg-green-900/50 border-green-400 dark:border-green-600 ring-1 ring-green-300 dark:ring-green-700 opacity-100"
+                                  : "border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 opacity-60 hover:opacity-100 hover:border-blue-300 dark:hover:border-blue-600 hover:bg-white dark:hover:bg-gray-800"
+                              }`}
+                              onClick={() => setSelectedPlayer(pick)}
+                              title={isAutoSubIn ? "Auto Substituted In" : "Click để xem chi tiết"}
+                            >
+                              <span className={`flex-1 truncate text-[10px] sm:text-[11px] ${isAutoSubIn ? 'text-green-700 dark:text-green-300 font-medium' : 'text-muted-foreground hover:text-black dark:hover:text-white'}`}>
+                                {isAutoSubIn && <span className="text-green-600 mr-0.5" title="Auto Sub">⬆️</span>}
+                                {pick.elementName}
+                              </span>
+                              <span className={`font-mono text-[10px] sm:text-xs ${isAutoSubIn ? 'text-green-700 dark:text-green-300 font-bold' : allMatchesNotStarted ? 'text-orange-400' : 'text-gray-500'}`}>
+                                {allMatchesNotStarted ? <>--</> : point}
+                              </span>
+                            </div>
+                          )
+                        })}
+                    </div>
                   </div>
                 ) : (
                   <div className="text-center py-4 text-muted-foreground">Không có dữ liệu đội hình</div>

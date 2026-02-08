@@ -217,6 +217,43 @@ function getTeamByEntryId(entryId: number): string | undefined {
   return undefined;
 }
 
+// Kiểm tra xem tất cả trận của 1 cầu thủ đã kết thúc chưa
+function checkAllMatchesFinished(pick: any): boolean {
+  const explain = pick?.explain ?? [];
+  if (explain.length === 0) return false;
+  return explain.every((exp: any) => exp.finished_provisional === true);
+}
+
+// Tính multiplier thực tế dựa trên captain/vice-captain status
+function calculateEffectiveMultiplier(
+  pick: any,
+  captain: any,
+  viceCaptain: any,
+  captainDidNotPlay: boolean,
+  isTripleCaptain: boolean
+): number {
+  // Nếu captain đã đá hoặc chưa kết thúc trận → giữ nguyên multiplier từ API
+  if (!captainDidNotPlay) {
+    return pick.multiplier;
+  }
+
+  // Captain không đá (trận đã kết thúc) → captain multiplier = 0
+  if (pick.is_captain) {
+    return 0;
+  }
+
+  // Vice-captain nhận multiplier thay captain
+  if (pick.is_vice_captain) {
+    const viceMinutes = pick?.stats?.minutes ?? 0;
+    if (viceMinutes > 0) {
+      return isTripleCaptain ? 3 : 2;
+    }
+  }
+
+  // Các cầu thủ khác giữ nguyên
+  return pick.multiplier;
+}
+
 // Xác định trạng thái thi đấu của 1 cầu thủ trong Gameweek hiện tại
 function getMatchStatus(fixture: any, exp: any): string {
   const minutesStat = exp.stats?.find((s: any) => s.identifier === 'minutes');
@@ -244,19 +281,102 @@ function getMatchStatus(fixture: any, exp: any): string {
   return status;
 }
 
-// Đếm số cầu thủ ra sân
+/**
+ * Áp dụng logic auto-sub (thay người tự động)
+ * Quy tắc FPL:
+ * - GK chỉ thay cho GK (position 12)
+ * - Outfield thay cho outfield theo thứ tự (position 13, 14, 15)
+ * - Chỉ thay khi cầu thủ chính có 0 phút VÀ tất cả trận đã kết thúc
+ * - Cầu thủ dự bị phải có > 0 phút mới được tính vào
+ * 
+ * @param requireFinished - Nếu true, chỉ auto-sub khi trận kết thúc (cho tính điểm). 
+ *                          Nếu false, hiển thị potential auto-sub (cho UI display).
+ */
+function applyAutoSub(picks: any[], liveData: any, requireFinished: boolean = false): any[] {
+  // Tạo copy để không mutate original
+  const result = picks.map(p => ({ ...p, isAutoSubIn: false }));
+
+  const starters = result.filter(p => p.position <= 11);
+  const bench = result.filter(p => p.position > 11).sort((a, b) => a.position - b.position);
+
+  const getMinutes = (pick: any) => {
+    const live = liveData.elements.find((el: any) => el.id === pick.element);
+    return live?.stats?.minutes ?? 0;
+  };
+
+  const isGK = (pick: any) => pick.element_type === 1; // element_type 1 = GK
+
+  // Tìm các cầu thủ chính không ra sân (0 phút)
+  // Nếu requireFinished = true, phải đợi trận kết thúc (cho tính điểm)
+  // Nếu requireFinished = false, hiển thị potential auto-sub (cho UI)
+  const startersNotPlayed = starters.filter(pick => {
+    const minutes = getMinutes(pick);
+    if (requireFinished) {
+      const allFinished = checkAllMatchesFinished(pick);
+      return minutes === 0 && allFinished;
+    }
+    return minutes === 0;
+  });
+
+  // Xử lý auto-sub cho từng cầu thủ không ra sân
+  let usedBenchPositions: number[] = [];
+
+  startersNotPlayed.forEach(starter => {
+    const starterIsGK = isGK(starter);
+
+    // Tìm cầu thủ dự bị phù hợp
+    const eligibleSubs = bench.filter(sub => {
+      // Đã dùng rồi thì skip
+      if (usedBenchPositions.includes(sub.position)) return false;
+
+      const subMinutes = getMinutes(sub);
+      const subAllFinished = checkAllMatchesFinished(sub);
+
+      // Sub phải đã đá (> 0 phút)
+      if (subMinutes === 0) return false;
+
+      // GK chỉ thay cho GK
+      if (starterIsGK) {
+        return isGK(sub);
+      }
+
+      // Outfield thay cho outfield (không phải GK)
+      return !isGK(sub);
+    });
+
+    if (eligibleSubs.length > 0) {
+      // Lấy sub đầu tiên theo thứ tự ghế dự bị
+      const sub = eligibleSubs[0];
+      usedBenchPositions.push(sub.position);
+
+      // Đánh dấu sub được vào sân
+      const subIndex = result.findIndex(p => p.element === sub.element);
+      if (subIndex !== -1) {
+        result[subIndex].isAutoSubIn = true;
+      }
+    }
+  });
+
+  return result;
+}
+
+// Đếm số cầu thủ ra sân (bao gồm auto-sub)
 function calculatePlayed(picks: any[], liveData: any, activeChip?: string) {
   let played = 0;
 
-  const starters = picks.filter((p: any) => p.position <= 11);
   const captain = picks.find((p: any) => p.is_captain);
   const viceCaptain = picks.find((p: any) => p.is_vice_captain);
 
   const isTripleCaptain = activeChip === '3xc';
   const isBenchBoost = activeChip === 'bboost';
 
-  // Nếu Bench Boost → tính cả 15 cầu thủ
-  const playersToCheck = isBenchBoost ? picks : starters;
+  // Áp dụng auto-sub để xác định cầu thủ được tính điểm
+  const picksWithAutoSub = applyAutoSub(picks, liveData);
+
+  // Xác định các cầu thủ được tính điểm
+  const playersToCheck = isBenchBoost
+    ? picksWithAutoSub // Bench Boost: tất cả 15 cầu thủ
+    : picksWithAutoSub.filter((p: any) => p.position <= 11 || p.isAutoSubIn); // Starters + auto-sub
 
   playersToCheck.forEach(pick => {
     const playerLive = liveData.elements.find(
@@ -274,13 +394,17 @@ function calculatePlayed(picks: any[], liveData: any, activeChip?: string) {
     }
   });
 
-  // ✅ Nếu captain không ra sân → VC thay
+  // ✅ Nếu captain không ra sân VÀ tất cả trận của captain đã kết thúc → VC thay
   if (captain) {
     const capLive = liveData.elements.find(
       (el: any) => el.id === captain.element
     );
     const capMinutes = capLive?.stats?.minutes ?? 0;
-    if (capMinutes === 0 && viceCaptain) {
+    const captainPick = picks.find((p: any) => p.element === captain.element);
+    const allCaptainMatchesFinished = checkAllMatchesFinished(captainPick);
+
+    // Chỉ khi captain có 0 phút VÀ tất cả trận của captain đã kết thúc
+    if (capMinutes === 0 && allCaptainMatchesFinished && viceCaptain) {
       const viceLive = liveData.elements.find(
         (el: any) => el.id === viceCaptain.element
       );
@@ -359,26 +483,54 @@ function calculatePlayerPoints(explain: any[]): number {
 /**
  * Tính tổng điểm Gameweek (bao gồm bonus, trừ điểm chuyển nhượng).
  * Nếu dùng Bench Boost thì tính cả cầu thủ dự bị.
+ * Nếu không dùng Bench Boost, tính cả auto-sub.
  */
 function calculateGWPoints(
   picksWithBonus: any[],
   transferCost: number,
+  liveData: any,
   activeChip?: string
 ): number {
   const isBenchBoost = activeChip === 'bboost';
+  const isTripleCaptain = activeChip === '3xc';
 
-  // Nếu không dùng bench boost → chỉ lấy 11 cầu thủ chính
+  // Tìm captain và vice-captain
+  const captain = picksWithBonus.find((p: any) => p.is_captain);
+  const viceCaptain = picksWithBonus.find((p: any) => p.is_vice_captain);
+
+  // Kiểm tra captain có đá không (chỉ khi tất cả trận đã kết thúc)
+  const captainMinutes = captain?.stats?.minutes ?? 0;
+  const allCaptainMatchesFinished = checkAllMatchesFinished(captain);
+  const captainDidNotPlay = captainMinutes === 0 && allCaptainMatchesFinished;
+
+  // Áp dụng auto-sub (requireFinished = true để chỉ tính điểm khi trận kết thúc)
+  const picksWithAutoSub = applyAutoSub(picksWithBonus, liveData, true);
+
+  // Xác định các cầu thủ được tính điểm
   const validPicks = isBenchBoost
-    ? picksWithBonus
-    : picksWithBonus.filter((pick: any) => pick.position <= 11);
+    ? picksWithAutoSub
+    : picksWithAutoSub.filter((pick: any) => pick.position <= 11 || pick.isAutoSubIn);
 
   // Tính tổng điểm cầu thủ
   let gwPoint = validPicks.reduce((sum: number, pick: any) => {
     const explain = pick?.explain ?? [];
-
     const playerPoints = calculatePlayerPoints(explain);
 
-    return sum + playerPoints * pick.multiplier;
+    // Cầu thủ auto-sub có multiplier = 1
+    if (pick.isAutoSubIn) {
+      return sum + playerPoints * 1;
+    }
+
+    // Tính multiplier thực tế cho các cầu thủ chính
+    const realMultiplier = calculateEffectiveMultiplier(
+      pick,
+      captain,
+      viceCaptain,
+      captainDidNotPlay,
+      isTripleCaptain
+    );
+
+    return sum + playerPoints * realMultiplier;
   }, 0);
 
   // Trừ điểm trừ do chuyển nhượng
@@ -422,6 +574,7 @@ export async function GET(request: NextRequest) {
           let elementName: string | undefined = undefined;
           let avatar: string | undefined = undefined;
           let clubName: string | undefined = undefined;
+          let elementType: number | undefined = undefined;
 
           if (liveData) {
             live =
@@ -432,6 +585,7 @@ export async function GET(request: NextRequest) {
             const player = elements.find((el: any) => el.id === pick.element);
             elementName = player ? player.web_name : undefined;
             avatar = player ? `${player.code}.png` : undefined;
+            elementType = player ? player.element_type : undefined;
             const team = teams.find((t: any) => t.id === player.team);
             clubName = team ? team.name : undefined;
           }
@@ -441,6 +595,7 @@ export async function GET(request: NextRequest) {
             elementName,
             avatar,
             clubName,
+            element_type: elementType,
             explain: live.explain,
             stats: live.stats,
           };
@@ -456,30 +611,44 @@ export async function GET(request: NextRequest) {
               );
 
               const match_status = getMatchStatus(fixture, exp);
+              const isFinished = fixture?.finished_provisional === true;
 
-              const bonusPoints = fixture?.bonus[pick.element];
+              // Kiểm tra bonus đã có trong exp.stats chưa
+              const existingBonusStat = exp.stats.find(
+                (s: any) => s.identifier === 'bonus'
+              );
 
-              if (bonusPoints) {
-                const hasBonus = exp.stats.some(
-                  (s: any) => s.identifier === 'bonus'
-                );
+              // Nếu trận đã kết thúc → dùng bonus từ API (nếu có)
+              // Nếu trận đang diễn ra → tính realtime bonus từ BPS
+              let bonusToAdd: number | null = null;
 
-                if (!hasBonus) {
-                  return {
-                    match_status,
-                    ...fixture,
-                    ...exp,
-                    stats: [
-                      ...exp.stats,
-                      {
-                        identifier: 'bonus',
-                        points: bonusPoints,
-                        value: bonusPoints,
-                        points_modification: 0,
-                      },
-                    ],
-                  };
+              if (isFinished) {
+                // Trận đã kết thúc: dùng bonus từ live.stats (API chính thức)
+                // KHÔNG thêm gì vào exp.stats vì API đã trả về đúng
+                // Bonus chính thức sẽ được tính từ live.stats.bonus
+              } else {
+                // Trận đang diễn ra: dùng realtime bonus từ BPS
+                const realtimeBonus = fixture?.bonus[pick.element];
+                if (realtimeBonus && !existingBonusStat) {
+                  bonusToAdd = realtimeBonus;
                 }
+              }
+
+              if (bonusToAdd !== null) {
+                return {
+                  match_status,
+                  ...fixture,
+                  ...exp,
+                  stats: [
+                    ...exp.stats,
+                    {
+                      identifier: 'bonus',
+                      points: bonusToAdd,
+                      value: bonusToAdd,
+                      points_modification: 0,
+                    },
+                  ],
+                };
               }
 
               return { ...exp, ...fixture, match_status };
@@ -487,28 +656,51 @@ export async function GET(request: NextRequest) {
 
             // 2️⃣ Sau khi merge bonus -> tính lại tổng điểm cầu thủ
             const explain = pick.explain ?? [];
-            const playerPoints = calculatePlayerPoints(explain);
-            const bonusPoints = calculateBonusPoints(explain);
+            const playerPointsFromExplain = calculatePlayerPoints(explain);
+            const bonusPointsFromExplain = calculateBonusPoints(explain);
+
+            // Kiểm tra xem có trận nào đã kết thúc không
+            const hasFinishedMatch = explain.some(
+              (exp: any) => exp.finished_provisional === true
+            );
+
+            // Nếu có trận đã kết thúc → ưu tiên bonus từ API (pick.stats.bonus)
+            // Nếu tất cả trận đang diễn ra → dùng bonus realtime từ explain
+            const apiBonusPoints = pick.stats?.bonus ?? 0;
+            const finalBonusPoints = hasFinishedMatch
+              ? Math.max(apiBonusPoints, bonusPointsFromExplain) // Lấy giá trị lớn hơn để đảm bảo không mất bonus
+              : bonusPointsFromExplain;
+
+            // Total points = explain points + bonus (nếu chưa có trong explain)
+            const totalPoints = playerPointsFromExplain;
 
             // 3️⃣ Cập nhật live.stats
             pick.stats = {
               ...(pick.stats || {}),
-              bonus: bonusPoints,
-              total_points: playerPoints,
+              bonus: finalBonusPoints,
+              total_points: totalPoints,
             };
           }
 
           return pick;
         });
 
+        // Áp dụng auto-sub logic để đánh dấu cầu thủ vào thay
+        // (Chỉ áp dụng khi KHÔNG dùng Bench Boost)
+        const isBenchBoost = activeChip === 'bboost';
+        const finalPicks = isBenchBoost
+          ? picksWithBonus.map((p: any) => ({ ...p, isAutoSubIn: false }))
+          : applyAutoSub(picksWithBonus, liveData);
+
         const picksDataWithLive = {
           ...picksData,
-          picks: picksWithBonus,
+          picks: finalPicks,
         };
 
         const gwPoint = calculateGWPoints(
           picksWithBonus,
           transferCost,
+          liveData,
           activeChip
         );
 
