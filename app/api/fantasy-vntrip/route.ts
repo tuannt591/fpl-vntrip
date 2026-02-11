@@ -10,7 +10,7 @@ async function getBootstrapData(): Promise<any> {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
-      }
+      },
     );
 
     if (response.ok) {
@@ -37,7 +37,7 @@ async function getElementLiveByEventId(eventId: number): Promise<any> {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
-      }
+      },
     );
 
     if (response.ok) {
@@ -61,7 +61,7 @@ async function getLeagueData(leagueId: string, phase: string): Promise<any> {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
-      }
+      },
     );
 
     if (!response.ok) {
@@ -79,7 +79,7 @@ async function getLeagueData(leagueId: string, phase: string): Promise<any> {
 
 async function getFixturesByEventId(
   eventId: number,
-  teams: any[]
+  teams: any[],
 ): Promise<any> {
   try {
     const response = await fetch(
@@ -89,7 +89,7 @@ async function getFixturesByEventId(
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
-      }
+      },
     );
 
     if (response.ok) {
@@ -104,7 +104,7 @@ async function getFixturesByEventId(
 
 async function getPicksByEntryId(
   entryId: number,
-  eventId: number
+  eventId: number,
 ): Promise<any> {
   try {
     const response = await fetch(
@@ -114,7 +114,7 @@ async function getPicksByEntryId(
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
-      }
+      },
     );
 
     if (response.ok) {
@@ -136,7 +136,7 @@ async function getTransferByEntryId(entryId: number): Promise<any> {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
-      }
+      },
     );
 
     if (response.ok) {
@@ -230,7 +230,7 @@ function calculateEffectiveMultiplier(
   captain: any,
   viceCaptain: any,
   captainDidNotPlay: boolean,
-  isTripleCaptain: boolean
+  isTripleCaptain: boolean,
 ): number {
   // Nếu captain đã đá hoặc chưa kết thúc trận → giữ nguyên multiplier từ API
   if (!captainDidNotPlay) {
@@ -288,16 +288,22 @@ function getMatchStatus(fixture: any, exp: any): string {
  * - Outfield thay cho outfield theo thứ tự (position 13, 14, 15)
  * - Chỉ thay khi cầu thủ chính có 0 phút VÀ tất cả trận đã kết thúc
  * - Cầu thủ dự bị phải có > 0 phút mới được tính vào
- * 
- * @param requireFinished - Nếu true, chỉ auto-sub khi trận kết thúc (cho tính điểm). 
+ *
+ * @param requireFinished - Nếu true, chỉ auto-sub khi trận kết thúc (cho tính điểm).
  *                          Nếu false, hiển thị potential auto-sub (cho UI display).
  */
-function applyAutoSub(picks: any[], liveData: any, requireFinished: boolean = false): any[] {
+function applyAutoSub(
+  picks: any[],
+  liveData: any,
+  requireFinished: boolean = false,
+): any[] {
   // Tạo copy để không mutate original
   const result = picks.map(p => ({ ...p, isAutoSubIn: false }));
 
   const starters = result.filter(p => p.position <= 11);
-  const bench = result.filter(p => p.position > 11).sort((a, b) => a.position - b.position);
+  const bench = result
+    .filter(p => p.position > 11)
+    .sort((a, b) => a.position - b.position);
 
   const getMinutes = (pick: any) => {
     const live = liveData.elements.find((el: any) => el.id === pick.element);
@@ -306,16 +312,13 @@ function applyAutoSub(picks: any[], liveData: any, requireFinished: boolean = fa
 
   const isGK = (pick: any) => pick.element_type === 1; // element_type 1 = GK
 
-  // Tìm các cầu thủ chính không ra sân (0 phút)
-  // Nếu requireFinished = true, phải đợi trận kết thúc (cho tính điểm)
-  // Nếu requireFinished = false, hiển thị potential auto-sub (cho UI)
+  // Tìm các cầu thủ chính không ra sân (0 phút VÀ tất cả trận đã kết thúc)
+  // Chỉ auto-sub khi chắc chắn cầu thủ không được đá (trận đã kết thúc + 0 phút)
+  // Không auto-sub khi trận chưa bắt đầu hoặc đang diễn ra
   const startersNotPlayed = starters.filter(pick => {
     const minutes = getMinutes(pick);
-    if (requireFinished) {
-      const allFinished = checkAllMatchesFinished(pick);
-      return minutes === 0 && allFinished;
-    }
-    return minutes === 0;
+    const allFinished = checkAllMatchesFinished(pick);
+    return minutes === 0 && allFinished;
   });
 
   // Xử lý auto-sub cho từng cầu thủ không ra sân
@@ -380,7 +383,7 @@ function calculatePlayed(picks: any[], liveData: any, activeChip?: string) {
 
   playersToCheck.forEach(pick => {
     const playerLive = liveData.elements.find(
-      (el: any) => el.id === pick.element
+      (el: any) => el.id === pick.element,
     );
     const minutes = playerLive?.stats?.minutes ?? 0;
 
@@ -397,7 +400,7 @@ function calculatePlayed(picks: any[], liveData: any, activeChip?: string) {
   // ✅ Nếu captain không ra sân VÀ tất cả trận của captain đã kết thúc → VC thay
   if (captain) {
     const capLive = liveData.elements.find(
-      (el: any) => el.id === captain.element
+      (el: any) => el.id === captain.element,
     );
     const capMinutes = capLive?.stats?.minutes ?? 0;
     const captainPick = picks.find((p: any) => p.element === captain.element);
@@ -406,7 +409,7 @@ function calculatePlayed(picks: any[], liveData: any, activeChip?: string) {
     // Chỉ khi captain có 0 phút VÀ tất cả trận của captain đã kết thúc
     if (capMinutes === 0 && allCaptainMatchesFinished && viceCaptain) {
       const viceLive = liveData.elements.find(
-        (el: any) => el.id === viceCaptain.element
+        (el: any) => el.id === viceCaptain.element,
       );
       const viceMinutes = viceLive?.stats?.minutes ?? 0;
       if (viceMinutes > 0) {
@@ -430,7 +433,7 @@ async function getTransfersThisGW(
   entryID: number,
   eventID: number,
   elements: any[],
-  picksData: any
+  picksData: any,
 ) {
   const chipUsed = picksData.active_chip;
   const eventTransfers = picksData.entry_history?.event_transfers ?? 0;
@@ -474,7 +477,7 @@ function calculatePlayerPoints(explain: any[]): number {
   return explain.reduce((playerSum: number, exp: any) => {
     const fixturePoints = exp.stats.reduce(
       (statSum: number, s: any) => statSum + (s.points ?? 0),
-      0
+      0,
     );
     return playerSum + fixturePoints;
   }, 0);
@@ -489,7 +492,7 @@ function calculateGWPoints(
   picksWithBonus: any[],
   transferCost: number,
   liveData: any,
-  activeChip?: string
+  activeChip?: string,
 ): number {
   const isBenchBoost = activeChip === 'bboost';
   const isTripleCaptain = activeChip === '3xc';
@@ -509,7 +512,9 @@ function calculateGWPoints(
   // Xác định các cầu thủ được tính điểm
   const validPicks = isBenchBoost
     ? picksWithAutoSub
-    : picksWithAutoSub.filter((pick: any) => pick.position <= 11 || pick.isAutoSubIn);
+    : picksWithAutoSub.filter(
+        (pick: any) => pick.position <= 11 || pick.isAutoSubIn,
+      );
 
   // Tính tổng điểm cầu thủ
   let gwPoint = validPicks.reduce((sum: number, pick: any) => {
@@ -527,7 +532,7 @@ function calculateGWPoints(
       captain,
       viceCaptain,
       captainDidNotPlay,
-      isTripleCaptain
+      isTripleCaptain,
     );
 
     return sum + playerPoints * realMultiplier;
@@ -566,7 +571,7 @@ export async function GET(request: NextRequest) {
           entryId,
           eventID,
           elements,
-          picksData
+          picksData,
         );
 
         const picksWithLive = picksData.picks.map((pick: any) => {
@@ -607,7 +612,7 @@ export async function GET(request: NextRequest) {
             // 1️⃣ Cập nhật explain với bonus
             pick.explain = pick.explain.map((exp: any) => {
               const fixture = fixtureData.find(
-                (b: any) => String(b.fixtureId) === String(exp.fixture)
+                (b: any) => String(b.fixtureId) === String(exp.fixture),
               );
 
               const match_status = getMatchStatus(fixture, exp);
@@ -615,7 +620,7 @@ export async function GET(request: NextRequest) {
 
               // Kiểm tra bonus đã có trong exp.stats chưa
               const existingBonusStat = exp.stats.find(
-                (s: any) => s.identifier === 'bonus'
+                (s: any) => s.identifier === 'bonus',
               );
 
               // Nếu trận đã kết thúc → dùng bonus từ API (nếu có)
@@ -661,7 +666,7 @@ export async function GET(request: NextRequest) {
 
             // Kiểm tra xem có trận nào đã kết thúc không
             const hasFinishedMatch = explain.some(
-              (exp: any) => exp.finished_provisional === true
+              (exp: any) => exp.finished_provisional === true,
             );
 
             // Nếu có trận đã kết thúc → ưu tiên bonus từ API (pick.stats.bonus)
@@ -701,14 +706,14 @@ export async function GET(request: NextRequest) {
           picksWithBonus,
           transferCost,
           liveData,
-          activeChip
+          activeChip,
         );
 
         const team = getTeamByEntryId(entryId);
         const playedInfo = calculatePlayed(
           picksDataWithLive.picks,
           liveData,
-          activeChip
+          activeChip,
         );
 
         return {
@@ -729,7 +734,7 @@ export async function GET(request: NextRequest) {
           },
           picks: picksDataWithLive.picks,
         };
-      })
+      }),
     );
 
     entriesWithPicks = entriesWithPicks
@@ -761,7 +766,7 @@ export async function GET(request: NextRequest) {
           'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         },
-      }
+      },
     );
   }
 }

@@ -42,6 +42,15 @@ export const ManagerAccordionList = ({
     }
   }
 
+  function getPositionBadge(elementType: number) {
+    switch (elementType) {
+      case 1: return { label: "GK", className: "bg-amber-500 text-white" };
+      case 2: return { label: "DEF", className: "bg-blue-500 text-white" };
+      case 3: return { label: "MID", className: "bg-green-500 text-white" };
+      default: return { label: "FWD", className: "bg-red-500 text-white" };
+    }
+  }
+
   // Hàm render dialog chi tiết player
   function renderPlayerDialog() {
     if (!selectedPlayer) return null;
@@ -208,8 +217,8 @@ export const ManagerAccordionList = ({
               </AccordionTrigger>
 
               {/* ---------------------detail info (clickable to toggle)----------------------- */}
-              <div 
-                className="flex items-center flex-wrap p-1 gap-1 border-t dark:border-gray-700 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              <div
+                className="flex items-center flex-wrap px-1 py-0.5 gap-1 border-t dark:border-gray-700 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                 onClick={() => {
                   if (isOpen) {
                     setOpenItems(openItems.filter(id => id !== entry.entry.toString()));
@@ -220,9 +229,9 @@ export const ManagerAccordionList = ({
               >
                 {/* Hiển thị tiền bank nếu có */}
                 {entry.entryHistory?.bank !== undefined && (
-                  <p className="text-xs">
+                  <span className="text-[10px]">
                     💰{(entry.entryHistory.value / 10).toFixed(1)}m
-                  </p>
+                  </span>
                 )}
 
                 {/* Hiển thị chip nếu có */}
@@ -230,18 +239,17 @@ export const ManagerAccordionList = ({
 
                 {/* Hiển thị played */}
                 {entry.playedInfo && (
-                  <div className="flex items-center gap-1 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded-full text-xs">
+                  <span className="bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded-full text-[10px]">
                     <span className="font-bold">Played&nbsp;</span>
                     {entry.playedInfo.played}/{entry.playedInfo.total}
-                  </div>
+                  </span>
                 )}
-
 
                 {/* Hiển thị transfer nếu có */}
                 {entry?.transfers && entry?.transfers.length > 0 && (
-                  <div className="flex flex-wrap gap-1 items-center text-xs">
+                  <div className="flex flex-wrap gap-0.5 items-center text-[10px]">
                     {entry.transfers.map((t: any, idx: number) => (
-                      <span key={idx} className="flex items-center gap-1 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded-full">
+                      <span key={idx} className="flex items-center gap-0.5 bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded-full">
                         <span className="line-through text-red-500">{t.element_out_name}</span>
                         <span>→</span>
                         <span className="text-green-600">{t.element_in_name}</span>
@@ -263,21 +271,32 @@ export const ManagerAccordionList = ({
                           const allMatchesNotStarted = pick?.explain.every(
                             (exp: any) => exp.match_status === PlayerMatchStatus.NOT_STARTED
                           );
+                          const allMatchesFinished = pick?.explain.every(
+                            (exp: any) => exp.match_status === PlayerMatchStatus.SUBSTITUTE || exp.match_status === PlayerMatchStatus.PLAYED
+                          );
                           const isAutoSubIn = pick.isAutoSubIn === true;
+                          const isAutoSubOut = !allMatchesNotStarted && allMatchesFinished && (pick?.stats?.minutes ?? 0) === 0;
+
+                          const posBadge = getPositionBadge(pick.element_type ?? 4);
 
                           return (
                             <div
                               key={pick.position}
-                              className={`cursor-pointer p-1.5 sm:p-2 flex items-center gap-1 sm:gap-2 text-xs rounded-md border shadow-sm transition-all duration-150 hover:scale-[1.02] hover:shadow-md active:scale-[0.98] ${
-                                isAutoSubIn
+                              className={`cursor-pointer p-1.5 sm:p-2 flex items-center gap-1 sm:gap-2 text-xs rounded-md border shadow-sm transition-all duration-150 hover:scale-[1.02] hover:shadow-md active:scale-[0.98] ${isAutoSubIn
                                   ? "bg-green-100 dark:bg-green-900/50 border-green-400 dark:border-green-600 ring-1 ring-green-300 dark:ring-green-700"
-                                  : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600"
-                              }`}
+                                  : isAutoSubOut
+                                    ? "bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-700 ring-1 ring-red-200 dark:ring-red-800"
+                                    : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600"
+                                }`}
                               onClick={() => setSelectedPlayer(pick)}
-                              title="Click để xem chi tiết"
+                              title={isAutoSubOut ? "Không được ra sân" : "Click để xem chi tiết"}
                             >
-                              <span className="flex-1 truncate text-black dark:text-white text-[11px] sm:text-xs font-medium">
-                                {isAutoSubIn && <span className="text-green-600 mr-0.5" title="Auto Sub">⬆️</span>}
+                              <span className={`shrink-0 text-[9px] sm:text-[10px] font-bold px-1 py-0.5 rounded ${posBadge.className}`}>
+                                {posBadge.label}
+                              </span>
+                              <span className={`flex-1 truncate text-[11px] sm:text-xs font-medium ${isAutoSubOut ? 'text-red-500 dark:text-red-400' : 'text-black dark:text-white'}`}>
+                                {isAutoSubIn && <span className="text-green-600 mr-0.5" title="Auto Sub In">⬆️</span>}
+                                {isAutoSubOut && <span className="text-red-500 mr-0.5" title="Không ra sân">⬇️</span>}
                                 {pick.elementName}&nbsp;
                                 {pick.is_captain && <span className="text-yellow-600 font-bold">(C)</span>}
                                 {pick.is_vice_captain && <span className="text-muted-foreground">(VC)</span>}
@@ -308,23 +327,26 @@ export const ManagerAccordionList = ({
                             (exp: any) => exp.match_status === PlayerMatchStatus.NOT_STARTED
                           );
                           const isAutoSubIn = pick.isAutoSubIn === true;
+                          const posBadge = getPositionBadge(pick.element_type ?? 4);
 
                           return (
                             <div
                               key={pick.position}
-                              className={`cursor-pointer p-1 sm:p-1.5 flex items-center gap-1 text-xs rounded border transition-all duration-150 active:scale-[0.98] ${
-                                isAutoSubIn
-                                  ? "bg-green-100 dark:bg-green-900/50 border-green-400 dark:border-green-600 ring-1 ring-green-300 dark:ring-green-700 opacity-100"
-                                  : "border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 opacity-60 hover:opacity-100 hover:border-blue-300 dark:hover:border-blue-600 hover:bg-white dark:hover:bg-gray-800"
-                              }`}
+                              className={`cursor-pointer p-1 sm:p-1.5 flex items-center gap-1 text-xs rounded border transition-all duration-150 active:scale-[0.98] ${isAutoSubIn
+                                ? "bg-green-100 dark:bg-green-900/50 border-green-400 dark:border-green-600 ring-1 ring-green-300 dark:ring-green-700"
+                                : "border border-gray-300 dark:border-gray-500 bg-gray-100 dark:bg-gray-800/80 hover:border-blue-300 dark:hover:border-blue-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+                                }`}
                               onClick={() => setSelectedPlayer(pick)}
                               title={isAutoSubIn ? "Auto Substituted In" : "Click để xem chi tiết"}
                             >
-                              <span className={`flex-1 truncate text-[10px] sm:text-[11px] ${isAutoSubIn ? 'text-green-700 dark:text-green-300 font-medium' : 'text-muted-foreground hover:text-black dark:hover:text-white'}`}>
+                              <span className={`shrink-0 text-[9px] sm:text-[10px] font-bold px-1 py-0.5 rounded ${posBadge.className}`}>
+                                {posBadge.label}
+                              </span>
+                              <span className={`flex-1 truncate text-[10px] sm:text-[11px] ${isAutoSubIn ? 'text-green-700 dark:text-green-300 font-medium' : 'text-gray-700 dark:text-gray-300 font-medium'}`}>
                                 {isAutoSubIn && <span className="text-green-600 mr-0.5" title="Auto Sub">⬆️</span>}
                                 {pick.elementName}
                               </span>
-                              <span className={`font-mono text-[10px] sm:text-xs ${isAutoSubIn ? 'text-green-700 dark:text-green-300 font-bold' : allMatchesNotStarted ? 'text-orange-400' : 'text-gray-500'}`}>
+                              <span className={`font-mono text-[10px] sm:text-xs ${isAutoSubIn ? 'text-green-700 dark:text-green-300 font-bold' : allMatchesNotStarted ? 'text-orange-500 font-bold' : 'text-gray-600 dark:text-gray-400 font-bold'}`}>
                                 {allMatchesNotStarted ? <>--</> : point}
                               </span>
                             </div>

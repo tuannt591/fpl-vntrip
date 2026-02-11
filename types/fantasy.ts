@@ -39,6 +39,7 @@ export type LivePlayerData = {
 export type PickWithLive = Pick & {
   liveData?: LivePlayerData | null;
   elementName?: string;
+  element_type?: number;
   isAutoSubIn?: boolean;
 };
 
