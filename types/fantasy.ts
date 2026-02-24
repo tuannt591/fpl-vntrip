@@ -117,3 +117,28 @@ export enum PlayerMatchStatus {
   // SUB_OFF = 'sub_off', // Bị thay ra khỏi sân
   UNKNOWN = 'unknown', // Không xác định
 }
+
+// Team Weekly Win/Loss types
+export type WeeklyTeamResult = {
+  name: string;
+  points: number;
+  result: 'win' | 'loss' | 'mid';
+  members: { entryId: number; points: number }[];
+};
+
+export type WeeklyResult = {
+  gw: number;
+  teams: WeeklyTeamResult[];
+};
+
+export type TeamRecord = {
+  wins: number;
+  losses: number;
+  mid: number;
+};
+
+export type TeamWeeklyData = {
+  teamRecords: Record<string, TeamRecord>;
+  weeklyResults: WeeklyResult[];
+  totalGW: number;
+};

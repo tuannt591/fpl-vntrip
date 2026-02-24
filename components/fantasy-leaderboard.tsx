@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Skeleton } from "./ui/skeleton";
 import { ManagerAccordionList } from './ui/manager-accordion-list';
-import { LeaderboardEntry, TeamConfig, TeamStats } from '@/types/fantasy';
+import { LeaderboardEntry, TeamConfig, TeamStats, TeamWeeklyData } from '@/types/fantasy';
 
 // Constants
 const VNTRIP_LEAGUE_ID = "1405297";
@@ -42,12 +43,22 @@ const fetchFantasyVntripData = async (
     return data;
   } catch (error) {
     console.error('Error fetching all leaderboard data:', error);
-    // Return empty data if API fails
     return {
       entries: [],
       leagueName: "Không thể tải dữ liệu league",
       currentGW: 0,
     };
+  }
+};
+
+const fetchTeamWeeklyData = async (): Promise<TeamWeeklyData | null> => {
+  try {
+    const response = await fetch('/api/fantasy-vntrip/team-weekly');
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching team weekly data:', error);
+    return null;
   }
 };
 
@@ -74,12 +85,9 @@ const TEAMS: TeamConfig[] = [
 const calculateTeamStats = (entries: LeaderboardEntry[]): TeamStats[] => {
   return TEAMS.map(team => {
     const teamMembers = entries.filter(entry => team.entries.includes(entry.entry));
-    // Tính tổng điểm GW hiện tại
     const totalPoints = teamMembers.reduce((sum, member) => sum + member.gwPoint, 0);
     const averagePoints = teamMembers.length > 0 ? Math.round(totalPoints / teamMembers.length) : 0;
     const bestRank = teamMembers.length > 0 ? Math.min(...teamMembers.map(member => member.rank)) : 0;
-
-    // Tính tổng số cầu thủ đã ra sân của team
     const totalPlayed = teamMembers.reduce((sum, member) => sum + (member.playedInfo?.played ?? 0), 0);
     const totalPlayedMax = teamMembers.reduce((sum, member) => sum + (member.playedInfo?.total ?? 0), 0);
 
@@ -112,6 +120,16 @@ const ManagersSkeleton = () => (
   </>
 );
 
+// Team color mapping
+const TEAM_COLORS: Record<string, { text: string; bg: string; border: string }> = {
+  '87': { text: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/30' },
+  '89': { text: 'text-violet-500', bg: 'bg-violet-500/10', border: 'border-violet-500/30' },
+  '3T': { text: 'text-amber-500', bg: 'bg-amber-500/10', border: 'border-amber-500/30' },
+};
+
+// Extract team short name from full name (e.g. "87 Team" -> "87")
+const getTeamShortName = (fullName: string) => fullName.replace(' Team', '');
+
 export const FantasyLeaderboard = () => {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [teamStats, setTeamStats] = useState<TeamStats[]>([]);
@@ -121,19 +139,19 @@ export const FantasyLeaderboard = () => {
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [selectedGW, setSelectedGW] = useState<number>(0);
+  const [teamWeeklyData, setTeamWeeklyData] = useState<TeamWeeklyData | null>(null);
+  const [selectedTeamDialog, setSelectedTeamDialog] = useState<string | null>(null);
   const currentLeagueId = VNTRIP_LEAGUE_ID;
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Hàm reload dữ liệu
   const reloadData = () => {
     setReloadKey(prev => prev + 1);
     setSelectedGW(0);
   };
 
-  // Load all data once when component mounts hoặc khi reloadKey thay đổi
   useEffect(() => {
     const loadAllData = async () => {
       if (!mounted) return;
@@ -142,12 +160,16 @@ export const FantasyLeaderboard = () => {
       setError(null);
 
       try {
-        const result = await fetchFantasyVntripData(currentLeagueId, CURRENT_PHASE, selectedGW);
+        const [result, weeklyData] = await Promise.all([
+          fetchFantasyVntripData(currentLeagueId, CURRENT_PHASE, selectedGW),
+          fetchTeamWeeklyData(),
+        ]);
         console.log('----result----', result);
 
         setLeaderboardData(result.entries);
         setCurrentGW(result.currentGW);
         setTeamStats(calculateTeamStats(result.entries));
+        if (weeklyData) setTeamWeeklyData(weeklyData);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Có lỗi xảy ra khi tải dữ liệu');
         setLeaderboardData([]);
@@ -160,6 +182,19 @@ export const FantasyLeaderboard = () => {
 
     loadAllData();
   }, [mounted, currentLeagueId, reloadKey, selectedGW]);
+
+  // Lấy record cho team đang mở dialog
+  const selectedTeamRecord = selectedTeamDialog && teamWeeklyData
+    ? teamWeeklyData.teamRecords[selectedTeamDialog]
+    : null;
+
+  // Lấy danh sách tuần cho team đang mở dialog
+  const selectedTeamWeeks = selectedTeamDialog && teamWeeklyData
+    ? [...teamWeeklyData.weeklyResults].reverse().map(week => {
+      const teamResult = week.teams.find(t => t.name === selectedTeamDialog);
+      return { gw: week.gw, ...teamResult };
+    }).filter(w => w.result)
+    : [];
 
   return (
     <div className="container mx-auto py-4 px-2">
@@ -187,7 +222,6 @@ export const FantasyLeaderboard = () => {
               )}
             </div>
 
-            {/* Nút reload */}
             <button
               onClick={reloadData}
               className="ml-2 px-2 py-1 rounded bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium flex items-center gap-1 disabled:opacity-60"
@@ -203,23 +237,39 @@ export const FantasyLeaderboard = () => {
 
         <CardContent className="px-0">
           <div>
-            {/* Team Stats Section - chỉ hiển thị cho league vntrip */}
+            {/* Team Stats Section */}
             {!isLoading && teamStats.length > 0 && currentLeagueId === VNTRIP_LEAGUE_ID && (
               <div className="mb-6">
                 <div className="grid grid-cols-3 gap-2 mb-6">
-                  {teamStats.map((team, index) => (
-                    <Card key={index} className='bg-gray-100 dark:bg-gray-800'>
-                      <CardHeader className='p-2'>
-                        <CardTitle className={`text-lg text-center ${team.color}`}>{team.name}</CardTitle>
-                      </CardHeader>
-                      <CardContent className="pt-0 pb-2">
-                        <p className="font-mono text-2xl font-extrabold text-center">{team.totalPoints.toLocaleString()}</p>
-                        <p className="text-xs text-center text-muted-foreground">
-                          Played: {team.totalPlayed}/{team.totalPlayedMax}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  ))}
+                  {teamStats.map((team, index) => {
+                    const shortName = getTeamShortName(team.name);
+                    const record = teamWeeklyData?.teamRecords[shortName];
+                    const colors = TEAM_COLORS[shortName];
+                    return (
+                      <Card
+                        key={index}
+                        className={`bg-gray-100 dark:bg-gray-800 cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] active:scale-[0.98] ${record ? 'ring-1 ring-transparent hover:ring-gray-300 dark:hover:ring-gray-600' : ''}`}
+                        onClick={() => record && setSelectedTeamDialog(shortName)}
+                      >
+                        <CardHeader className='p-2'>
+                          <CardTitle className={`text-lg text-center ${team.color}`}>{team.name}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-0 pb-2">
+                          <p className="font-mono text-2xl font-extrabold text-center">{team.totalPoints.toLocaleString()}</p>
+                          <p className="text-xs text-center text-muted-foreground">
+                            Played: {team.totalPlayed}/{team.totalPlayedMax}
+                          </p>
+                          {/* W/L inline */}
+                          {record && (
+                            <div className="flex justify-center gap-2 mt-1.5 text-xs font-mono">
+                              <span className="text-green-600 font-bold">{record.wins}W</span>
+                              <span className="text-red-500 font-bold">{record.losses}L</span>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -253,6 +303,65 @@ export const FantasyLeaderboard = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Team Weekly Dialog */}
+      <Dialog open={!!selectedTeamDialog} onOpenChange={(open) => !open && setSelectedTeamDialog(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className={`text-center ${selectedTeamDialog ? TEAM_COLORS[selectedTeamDialog]?.text : ''}`}>
+              {selectedTeamDialog} Team
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              {selectedTeamRecord && (
+                <span className="font-mono text-base">
+                  <span className="text-green-600 font-bold">{selectedTeamRecord.wins} Thắng</span>
+                  {' · '}
+                  <span className="text-red-500 font-bold">{selectedTeamRecord.losses} Thua</span>
+                  {' · '}
+                  <span className="text-muted-foreground">{teamWeeklyData?.totalGW} tuần</span>
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-[400px] overflow-y-auto -mx-2">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-background">
+                <tr className="border-b">
+                  <th className="py-1.5 px-2 text-left font-semibold text-xs">GW</th>
+                  <th className="py-1.5 px-2 text-center font-semibold text-xs">Điểm</th>
+                  <th className="py-1.5 px-2 text-center font-semibold text-xs">Kết quả</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedTeamWeeks.map(week => (
+                  <tr key={week.gw} className="border-b border-gray-100 dark:border-gray-800">
+                    <td className="py-1.5 px-2 font-medium text-xs">GW {week.gw}</td>
+                    <td className="py-1.5 px-2 text-center font-mono text-xs">{week.points}</td>
+                    <td className="py-1.5 px-2 text-center">
+                      {week.result === 'win' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-semibold">
+                          🏆 Thắng
+                        </span>
+                      )}
+                      {week.result === 'loss' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs font-semibold">
+                          Thua
+                        </span>
+                      )}
+                      {week.result === 'mid' && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 text-xs">
+                          Hoà
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
