@@ -10,8 +10,11 @@ async function getBootstrapData(): Promise<any> {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
+        next: { revalidate: 60 },
       },
     );
+
+    console.log(`[API] bootstrap-static -> status: ${response.status}`);
 
     if (response.ok) {
       const data = await response.json();
@@ -23,9 +26,9 @@ async function getBootstrapData(): Promise<any> {
       };
     }
   } catch (error) {
-    console.error('Error fetching current gameweek:', error);
+    console.error('[API] Error fetching bootstrap-static:', error);
   }
-  return { currentEvent: 1, elements: [] }; // fallback to gameweek 1
+  return { currentEvent: 1, elements: [], teams: [] }; // fallback
 }
 
 async function getElementLiveByEventId(eventId: number): Promise<any> {
@@ -37,15 +40,18 @@ async function getElementLiveByEventId(eventId: number): Promise<any> {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
+        next: { revalidate: 30 },
       },
     );
+
+    console.log(`[API] event/${eventId}/live -> status: ${response.status}`);
 
     if (response.ok) {
       const data = await response.json();
       return data;
     }
   } catch (error) {
-    console.error('Error fetching element live data:', error);
+    console.error(`[API] Error fetching event/${eventId}/live:`, error);
   }
   return null;
 }
@@ -61,8 +67,11 @@ async function getLeagueData(leagueId: string, phase: string): Promise<any> {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
+        next: { revalidate: 60 },
       },
     );
+
+    console.log(`[API] leagues-classic/${leagueId} -> status: ${response.status}`);
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -72,7 +81,7 @@ async function getLeagueData(leagueId: string, phase: string): Promise<any> {
 
     return leagueData;
   } catch (error) {
-    console.error('Error fetching element live data:', error);
+    console.error(`[API] Error fetching league ${leagueId}:`, error);
   }
   return null;
 }
@@ -89,15 +98,18 @@ async function getFixturesByEventId(
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
+        next: { revalidate: 30 },
       },
     );
+
+    console.log(`[API] fixtures/?event=${eventId} -> status: ${response.status}`);
 
     if (response.ok) {
       const data = await response.json();
       return calculateBonus(data, teams);
     }
   } catch (error) {
-    console.error('Error fetching element live data:', error);
+    console.error(`[API] Error fetching fixtures for event ${eventId}:`, error);
   }
   return null;
 }
@@ -114,15 +126,18 @@ async function getPicksByEntryId(
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
+        next: { revalidate: 30 },
       },
     );
+
+    console.log(`[API] entry/${entryId}/picks -> status: ${response.status}`);
 
     if (response.ok) {
       const data = await response.json();
       return data;
     }
   } catch (error) {
-    console.error('Error fetching picks data:', error);
+    console.error(`[API] Error fetching picks for entry ${entryId}:`, error);
   }
   return null;
 }
@@ -555,14 +570,45 @@ export async function GET(request: NextRequest) {
     const { currentEvent, elements, teams } = await getBootstrapData();
     const eventID = gw && parseInt(gw) > 0 ? parseInt(gw) : currentEvent;
 
-    const liveData = await getElementLiveByEventId(eventID);
-    const fixtureData = await getFixturesByEventId(eventID, teams);
-    const leagueData = await getLeagueData(leagueId, phase);
+    console.log(`[API] Request: leagueId=${leagueId}, phase=${phase}, gw=${eventID}`);
+
+    const [liveData, fixtureData, leagueData] = await Promise.all([
+      getElementLiveByEventId(eventID),
+      getFixturesByEventId(eventID, teams),
+      getLeagueData(leagueId, phase),
+    ]);
+
+    // Null checks — FPL API có thể block IP Vercel hoặc rate-limit
+    if (!liveData) {
+      console.error('[API] liveData is null — FPL event/live API failed');
+      return NextResponse.json(
+        { error: 'FPL API unavailable: could not fetch live data. Possibly rate-limited.' },
+        { status: 502 },
+      );
+    }
+    if (!fixtureData) {
+      console.error('[API] fixtureData is null — FPL fixtures API failed');
+      return NextResponse.json(
+        { error: 'FPL API unavailable: could not fetch fixture data. Possibly rate-limited.' },
+        { status: 502 },
+      );
+    }
+    if (!leagueData?.standings?.results) {
+      console.error('[API] leagueData is null or missing standings — FPL league API failed');
+      return NextResponse.json(
+        { error: 'FPL API unavailable: could not fetch league data. Possibly rate-limited.' },
+        { status: 502 },
+      );
+    }
 
     let entriesWithPicks = await Promise.all(
       leagueData.standings.results.map(async (entry: any) => {
         const entryId = entry.entry;
         const picksData = await getPicksByEntryId(entryId, eventID);
+        if (!picksData) {
+          console.warn(`[API] picksData is null for entry ${entryId} — skipping`);
+          return null;
+        }
         const activeChip = picksData.active_chip;
         const transferCost = picksData.entry_history?.event_transfers_cost ?? 0;
 
@@ -737,7 +783,9 @@ export async function GET(request: NextRequest) {
       }),
     );
 
+    // Filter out null entries (failed picks fetches)
     entriesWithPicks = entriesWithPicks
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
       .sort((a, b) => b.gwPoint - a.gwPoint)
       .map((entry, idx) => ({ ...entry, rank: idx + 1 }));
 
