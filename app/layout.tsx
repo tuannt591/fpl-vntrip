@@ -14,32 +14,12 @@ export const viewport: Viewport = {
   minimumScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#1a1a1a" },
-  ],
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://fpl-vntrip.vercel.app"),
-  title: {
-    default: "FPL Vntrip - Bảng Xếp Hạng Fantasy Premier League",
-    template: "%s | FPL Vntrip",
-  },
-  description:
-    "Theo dõi bảng xếp hạng Fantasy Premier League của nhóm Vntrip. Cập nhật điểm số theo tuần, đội hình, thống kê chi tiết và dữ liệu trực tiếp.",
-  keywords: [
-    "Fantasy Premier League",
-    "FPL",
-    "FPL Vntrip",
-    "bảng xếp hạng",
-    "leaderboard",
-    "bóng đá",
-    "football",
-    "Premier League",
-    "ngoại hạng Anh",
-    "fantasy football",
-  ],
+  title: "Fantasy Premier League Leaderboard - FPL Vntrip",
+  description: "View and track Fantasy Premier League leaderboards with detailed team statistics and player information. Real-time points, team formations, and live scoring data.",
+  keywords: ["Fantasy Premier League", "FPL", "leaderboard", "football", "soccer", "vntrip"],
   authors: [{ name: "Nguyen Tuan" }],
   creator: "Nguyen Tuan",
   publisher: "Vntrip",

@@ -1,163 +1,198 @@
-# Fantasy Premier League Leaderboard
+# Fantasy Premier League Leaderboard – FPL Vntrip
 
 A modern web application to view and track Fantasy Premier League (FPL)
-leaderboards with detailed team statistics and player information.
+leaderboards with detailed team statistics, live player information, and weekly
+team win/loss tracking.
 
-## <a href="https://ui.shadcn.com/" target="_blank">Shadcn/ui</a> + <a href="https://nextjs.org/" target="_blank">Next.js</a> + <a href="https://www.typescriptlang.org/" target="_blank">TypeScript</a> + <a href="https://tailwindcss.com/" target="_blank">Tailwind CSS</a>
+## Tech Stack
+
+[Shadcn/ui](https://ui.shadcn.com/) · [Next.js 14](https://nextjs.org/) · [TypeScript](https://www.typescriptlang.org/) · [Tailwind CSS](https://tailwindcss.com/) · [Radix UI](https://www.radix-ui.com/)
 
 ## Features
 
 ### Core Features
 
-- [x] **League Leaderboard Display** - View any FPL league standings by League
-      ID
-- [x] **Live Player Picks** - Click on any manager to see their current gameweek
-      team
-- [x] **Team Formation View** - Visual football pitch layout showing player
-      positions
-- [x] **Real-time Points** - Live scoring data with captain/vice-captain
-      multipliers
-- [x] **Team Statistics** - Special stats for Vntrip team members (87 Team, 89
-      Team, 3T Team)
-- [x] **Responsive Design** - Works perfectly on desktop and mobile devices
-- [x] **Dark/Light Mode** - Theme switching support
+- **League Leaderboard** – View any FPL league standings (default: Vntrip league `1405297`)
+- **Gameweek Selector** – Switch between any gameweek to view historical data
+- **Live GW Points** – Real-time scoring with captain / vice-captain multiplier handling
+- **Auto-Sub Logic** – Automatic substitution simulation following official FPL rules (GK ↔ GK, outfield order)
+- **Bonus Points** – Real-time BPS-based bonus calculation for in-progress matches; official bonus for finished matches
+- **Team Statistics** – Dedicated cards for **87 Team** and **89 Team** showing total points, played count, and W/L record
+- **Weekly Win/Loss Tracking** – Per-gameweek team comparison with win/loss/draw results and historical dialog
+- **Player Picks Accordion** – Expand any manager row to see their full squad, captain, transfers, chips, and per-player breakdown
+- **Transfer Details** – View player-in / player-out transfers for the current gameweek
+- **Chip Detection** – Display active chips (Wildcard, Free Hit, Bench Boost, Triple Captain)
+- **Dark/Light Mode** – Theme switching via `next-themes`
+- **Responsive Design** – Mobile-first layout with sticky header
+- **Excluded Entries** – Configurable list of entries to hide from the leaderboard
 
-### Technical Features
+### Technical Highlights
 
-- [x] **CORS Proxy** - Built-in API routes to handle Fantasy Premier League API
-      calls
-- [x] **TypeScript Support** - Full type safety throughout the application
-- [x] **Modern UI Components** - Built with Shadcn/ui component library
-- [x] **Error Handling** - Graceful error handling with user-friendly messages
-- [x] **Loading States** - Skeleton loaders for better user experience
+- **Unified API Route** – Single `/api/fantasy-vntrip` endpoint aggregates all FPL data (league, picks, live, fixtures, bootstrap, transfers)
+- **In-Memory Caching** – Bootstrap data cached in RAM with configurable TTL (`CACHE_DURATION`)
+- **CORS Support** – Built-in CORS headers for cross-origin access
+- **Centralized Config** – All FPL constants managed in `lib/fpl-config.ts`
+- **TypeScript Types** – Full type definitions in `types/fantasy.ts`
+- **Graceful Error Handling** – Per-entry null checks, 502 responses for upstream failures, and user-friendly error UI
+- **Skeleton Loaders** – Loading states for better UX
 
-## API Routes
+## API Route
 
-The application includes several API routes to proxy Fantasy Premier League
-data:
+The application exposes a single API route that acts as a proxy and data aggregator for the official FPL API:
 
-- `/api/fantasy-leaderboard` - Fetch league standings
-- `/api/fantasy-picks` - Get manager's team picks for specific gameweek
-- `/api/fantasy-bootstrap` - Player and team data
-- `/api/fantasy-live` - Live scoring data for current gameweek
+### `GET /api/fantasy-vntrip`
+
+| Parameter  | Default     | Description                                |
+| ---------- | ----------- | ------------------------------------------ |
+| `leagueId` | `314`       | FPL league ID                              |
+| `phase`    | `1`         | Season phase (1 = overall)                 |
+| `gw`       | `0` (current) | Gameweek number (0 = auto-detect current) |
+
+**Response** includes:
+
+```json
+{
+  "entries": [ /* manager data with picks, GW points, transfers, team, etc. */ ],
+  "leagueName": "Vntrip FPL",
+  "currentGW": 35,
+  "teamWeeklyData": { /* win/loss records and weekly results */ }
+}
+```
+
+Internally, this route calls the following FPL endpoints:
+
+- `bootstrap-static` – Player metadata, teams, current event (cached)
+- `leagues-classic/{id}/standings` – League standings
+- `entry/{id}/event/{gw}/picks` – Manager's picks per GW
+- `event/{gw}/live` – Live player stats
+- `fixtures?event={gw}` – Fixture data for bonus calculation
+- `entry/{id}/history` – Entry history for weekly team results
+- `entry/{id}/transfers` – Transfer history
 
 ## Project Structure
 
 ```
 ├── app/
-│   ├── api/                    # API routes for FPL data
-│   ├── globals.css            # Global styles and theme variables
-│   ├── layout.tsx             # Root layout component
-│   └── page.tsx               # Main page component
+│   ├── api/
+│   │   └── fantasy-vntrip/
+│   │       └── route.ts           # Unified API route (all FPL data)
+│   ├── globals.css                # Global styles & theme variables
+│   ├── head.tsx                   # HTML head configuration
+│   ├── layout.tsx                 # Root layout (Navbar, ThemeProvider, SEO)
+│   └── page.tsx                   # Home page → FantasyLeaderboard
 ├── components/
-│   ├── fantasy-leaderboard.tsx # Main leaderboard component
-│   ├── layout/                # Layout components (navbar, theme)
-│   └── ui/                    # Shadcn/ui components
+│   ├── fantasy-leaderboard.tsx    # Main leaderboard + team stats + GW selector
+│   ├── icons/                     # Social icons (GitHub, Discord, LinkedIn, X)
+│   ├── layout/
+│   │   ├── navbar.tsx             # Top navigation bar
+│   │   ├── theme-provider.tsx     # next-themes provider
+│   │   └── toogle-theme.tsx       # Dark/light mode toggle
+│   └── ui/
+│       ├── accordion.tsx          # Radix accordion primitive
+│       ├── badge.tsx              # Badge component
+│       ├── button.tsx             # Button variants (CVA)
+│       ├── card.tsx               # Card component
+│       ├── dialog.tsx             # Radix dialog primitive
+│       ├── manager-accordion-list.tsx  # Manager row with picks detail
+│       └── skeleton.tsx           # Skeleton loader
 ├── lib/
-│   └── utils.ts               # Utility functions
-└── public/                    # Static assets
+│   ├── fpl-config.ts              # FPL constants (teams, league ID, cache, etc.)
+│   └── utils.ts                   # cn() utility (clsx + tailwind-merge)
+├── types/
+│   └── fantasy.ts                 # TypeScript type definitions
+├── public/                        # Static assets (images, SVGs)
+├── next.config.mjs                # Next.js config (standalone, compress)
+├── tailwind.config.ts             # Tailwind config with custom theme
+├── tsconfig.json                  # TypeScript config
+└── package.json                   # Dependencies & scripts
 ```
 
 ## Installation
 
-1. Clone this repository:
-
 ```bash
+# 1. Clone the repository
 git clone https://github.com/tuannt591/fpl-vntrip.git
-```
 
-2. Navigate to project directory:
-
-```bash
+# 2. Navigate to project directory
 cd fpl-vntrip
+
+# 3. Install dependencies
+yarn install
+
+# 4. Run the development server
+yarn dev
+
+# 5. Open http://localhost:3000 in your browser
 ```
-
-3. Install dependencies:
-
-```bash
-npm install
-```
-
-4. Run the development server:
-
-```bash
-npm run dev
-```
-
-5. Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-## Usage
-
-### Viewing League Standings
-
-1. The app loads with the default Vntrip league (ID: 1405297)
-2. Enter any Fantasy Premier League ID in the input field and click "Tải" to
-   view other leagues
-3. The table shows rank, manager name, team name, gameweek points, and total
-   points
-
-### Viewing Team Details
-
-1. Click on any manager name in the leaderboard
-2. A modal will open showing their current gameweek team formation
-3. Players are displayed on a football pitch with their positions
-4. Points are shown with captain/vice-captain multipliers applied
-5. Bench players are displayed separately below the main formation
-
-### Team Statistics (Vntrip League Only)
-
-When viewing the Vntrip league, additional team statistics are shown:
-
-- **87 Team**: Members with specific entry IDs
-- **89 Team**: Members with specific entry IDs
-- **3T Team**: Members with specific entry IDs
-
-Each team shows total points, best rank, and member details.
 
 ## Configuration
 
-### Team Configuration
+All FPL-related constants are centralized in [`lib/fpl-config.ts`](lib/fpl-config.ts):
 
-To modify team groupings, edit the `TEAMS` constant in
+```typescript
+export const FPL_API_BASE = 'https://fantasy.premierleague.com/api';
+
+// Team groupings (team name → array of FPL entry IDs)
+export const TEAMS_CONFIG: { [key: string]: number[] } = {
+  '87': [2195023, 6293111, 6291846, 6400474],
+  '89': [4565469, 4550400, 5005626, 6425684],
+};
+
+// Win/Loss records counted from this GW onwards
+export const WIN_LOSS_START_GW = 32;
+
+// Entries excluded from the leaderboard
+export const EXCLUDED_ENTRIES = [3024127];
+
+// Bootstrap data cache duration (ms)
+export const CACHE_DURATION = 60 * 1000;
+
+// Default league
+export const VNTRIP_LEAGUE_ID = '1405297';
+export const CURRENT_PHASE = 1;
+```
+
+### Team UI Config
+
+Team colors for the leaderboard are configured in
 [`components/fantasy-leaderboard.tsx`](components/fantasy-leaderboard.tsx):
 
 ```typescript
 const TEAMS: TeamConfig[] = [
-  {
-    name: 'Your Team Name',
-    entries: [123456, 789012], // FPL entry IDs
-    color: 'bg-blue-500', // Tailwind color class
-  },
+  { name: '87 Team', entries: [...], color: 'text-red-500' },
+  { name: '89 Team', entries: [...], color: 'text-violet-500' },
 ];
 ```
 
-### Default League
-
-Change the default league by modifying `VNTRIP_LEAGUE_ID` in
-[`components/fantasy-leaderboard.tsx`](components/fantasy-leaderboard.tsx).
-
-## Build and Deploy
+## Build & Deploy
 
 ```bash
-# Build for production
-npm run build
+# Build for production (standalone output)
+yarn build
 
 # Start production server
-npm start
+yarn start
 
 # Lint code
-npm run lint
+yarn lint
 ```
+
+The app is configured with `output: 'standalone'` in `next.config.mjs` for
+optimized Docker / serverless deployments (e.g. Vercel).
 
 ## Technologies Used
 
-- **Next.js 14** - React framework with App Router
-- **TypeScript** - Type-safe JavaScript
-- **Tailwind CSS** - Utility-first CSS framework
-- **Shadcn/ui** - Modern React component library
-- **Radix UI** - Accessible component primitives
-- **Lucide React** - Beautiful icons
-- **Next Themes** - Theme switching
+| Technology              | Purpose                          |
+| ----------------------- | -------------------------------- |
+| **Next.js 14**          | React framework (App Router)     |
+| **TypeScript**          | Type safety                      |
+| **Tailwind CSS 3**      | Utility-first styling            |
+| **Shadcn/ui**           | UI component library             |
+| **Radix UI**            | Accessible primitives (Accordion, Dialog) |
+| **Lucide React**        | Icon library                     |
+| **next-themes**         | Dark / Light mode switching      |
+| **class-variance-authority** | Component variant management |
+| **clsx + tailwind-merge** | Conditional class merging      |
 
 ## API Data Source
 
@@ -165,7 +200,7 @@ This application uses the official Fantasy Premier League API:
 
 - Base URL: `https://fantasy.premierleague.com/api/`
 - No authentication required for public league data
-- Rate limiting may apply
+- Rate limiting may apply (the app returns 502 when upstream is unavailable)
 
 ## Contributing
 
@@ -177,11 +212,5 @@ This application uses the official Fantasy Premier League API:
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
+This project is licensed under the MIT License – see the [LICENSE](LICENSE) file
 for details.
-
-## Acknowledgments
-
-- Fantasy Premier League for providing the API
-- Shadcn for the excellent UI component library
-- The FPL community for inspiration and feedback
