@@ -141,4 +141,5 @@ export type TeamWeeklyData = {
   teamRecords: Record<string, TeamRecord>;
   weeklyResults: WeeklyResult[];
   totalGW: number;
+  winLossStartGW: number;
 };

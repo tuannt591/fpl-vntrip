@@ -6,10 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Skeleton } from "./ui/skeleton";
 import { ManagerAccordionList } from './ui/manager-accordion-list';
 import { LeaderboardEntry, TeamConfig, TeamStats, TeamWeeklyData } from '@/types/fantasy';
-
-// Constants
-const VNTRIP_LEAGUE_ID = "1405297";
-const CURRENT_PHASE = 1;
+import { VNTRIP_LEAGUE_ID, CURRENT_PHASE } from '@/lib/fpl-config';
 
 const fetchFantasyVntripData = async (
   leagueId: string,
@@ -45,43 +42,28 @@ const fetchFantasyVntripData = async (
     console.error('Error fetching all leaderboard data:', error);
     return {
       entries: [],
-      leagueName: "Không thể tải dữ liệu league",
+      leagueName: "Failed to load league data",
       currentGW: 0,
     };
   }
 };
 
-const fetchTeamWeeklyData = async (): Promise<TeamWeeklyData | null> => {
-  try {
-    const response = await fetch('/api/fantasy-vntrip/team-weekly');
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching team weekly data:', error);
-    return null;
-  }
-};
 
-// Cấu hình team
+// Team Config
 const TEAMS: TeamConfig[] = [
   {
     name: "87 Team",
-    entries: [2195023, 6293111, 6291846],
+    entries: [2195023, 6293111, 6291846, 6400474],
     color: "text-red-500"
   },
   {
     name: "89 Team",
-    entries: [4565469, 4550400, 5005626],
+    entries: [4565469, 4550400, 5005626, 6425684],
     color: "text-violet-500"
-  },
-  {
-    name: "3T Team",
-    entries: [6400474, 3024127, 6425684],
-    color: "text-amber-500"
   }
 ];
 
-// Hàm tính toán thống kê team theo điểm GW hiện tại
+// Calculate team stats based on current GW points
 const calculateTeamStats = (entries: LeaderboardEntry[]): TeamStats[] => {
   return TEAMS.map(team => {
     const teamMembers = entries.filter(entry => team.entries.includes(entry.entry));
@@ -124,7 +106,6 @@ const ManagersSkeleton = () => (
 const TEAM_COLORS: Record<string, { text: string; bg: string; border: string }> = {
   '87': { text: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/30' },
   '89': { text: 'text-violet-500', bg: 'bg-violet-500/10', border: 'border-violet-500/30' },
-  '3T': { text: 'text-amber-500', bg: 'bg-amber-500/10', border: 'border-amber-500/30' },
 };
 
 // Extract team short name from full name (e.g. "87 Team" -> "87")
@@ -160,18 +141,15 @@ export const FantasyLeaderboard = () => {
       setError(null);
 
       try {
-        const [result, weeklyData] = await Promise.all([
-          fetchFantasyVntripData(currentLeagueId, CURRENT_PHASE, selectedGW),
-          fetchTeamWeeklyData(),
-        ]);
+        const result = await fetchFantasyVntripData(currentLeagueId, CURRENT_PHASE, selectedGW);
         console.log('----result----', result);
 
         setLeaderboardData(result.entries);
         setCurrentGW(result.currentGW);
         setTeamStats(calculateTeamStats(result.entries));
-        if (weeklyData) setTeamWeeklyData(weeklyData);
+        if (result.teamWeeklyData) setTeamWeeklyData(result.teamWeeklyData);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Có lỗi xảy ra khi tải dữ liệu');
+        setError(err instanceof Error ? err.message : 'Error loading data');
         setLeaderboardData([]);
         setCurrentGW(0);
         setTeamStats([]);
@@ -183,12 +161,12 @@ export const FantasyLeaderboard = () => {
     loadAllData();
   }, [mounted, currentLeagueId, reloadKey, selectedGW]);
 
-  // Lấy record cho team đang mở dialog
+  // Get record for selected team in dialog
   const selectedTeamRecord = selectedTeamDialog && teamWeeklyData
     ? teamWeeklyData.teamRecords[selectedTeamDialog]
     : null;
 
-  // Lấy danh sách tuần cho team đang mở dialog
+  // Get weekly list for selected team
   const selectedTeamWeeks = selectedTeamDialog && teamWeeklyData
     ? [...teamWeeklyData.weeklyResults].reverse().map(week => {
       const teamResult = week.teams.find(t => t.name === selectedTeamDialog);
@@ -204,7 +182,7 @@ export const FantasyLeaderboard = () => {
             <div>
               Gameweek:&nbsp;
               {isLoading ? (
-                <span>Đang tải...</span>
+                <span>Loading...</span>
               ) : (
                 <select
                   value={selectedGW}
@@ -226,7 +204,7 @@ export const FantasyLeaderboard = () => {
               onClick={reloadData}
               className="ml-2 px-2 py-1 rounded bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium flex items-center gap-1 disabled:opacity-60"
               disabled={isLoading}
-              title="Tải lại dữ liệu"
+              title="Reload data"
               type="button"
             >
               <span className={isLoading ? 'animate-spin' : ''}>🔄</span>
@@ -240,7 +218,7 @@ export const FantasyLeaderboard = () => {
             {/* Team Stats Section */}
             {!isLoading && teamStats.length > 0 && currentLeagueId === VNTRIP_LEAGUE_ID && (
               <div className="mb-6">
-                <div className="grid grid-cols-3 gap-2 mb-6">
+                <div className="grid grid-cols-2 gap-4 max-w-2xl mx-auto mb-6">
                   {teamStats.map((team, index) => {
                     const shortName = getTeamShortName(team.name);
                     const record = teamWeeklyData?.teamRecords[shortName];
@@ -292,10 +270,10 @@ export const FantasyLeaderboard = () => {
               ) : error ? (
                 <div className="flex flex-col items-center justify-center space-y-2">
                   <span className="text-red-500">⚠️ {error}</span>
-                  <span className="text-sm text-muted-foreground">Không thể tải dữ liệu từ API</span>
+                  <span className="text-sm text-muted-foreground">Failed to load data from API</span>
                 </div>
               ) : leaderboardData.length === 0 ? (
-                <div className="text-center py-4 text-muted-foreground">Không có dữ liệu</div>
+                <div className="text-center py-4 text-muted-foreground">No data available</div>
               ) : (
                 <ManagerAccordionList managers={leaderboardData} />
               )}
@@ -314,11 +292,9 @@ export const FantasyLeaderboard = () => {
             <DialogDescription className="text-center">
               {selectedTeamRecord && (
                 <span className="font-mono text-base">
-                  <span className="text-green-600 font-bold">{selectedTeamRecord.wins} Thắng</span>
+                  <span className="text-green-600 font-bold">{selectedTeamRecord.wins} Wins</span>
                   {' · '}
-                  <span className="text-red-500 font-bold">{selectedTeamRecord.losses} Thua</span>
-                  {' · '}
-                  <span className="text-muted-foreground">{teamWeeklyData?.totalGW} tuần</span>
+                  <span className="text-red-500 font-bold">{selectedTeamRecord.losses} Losses</span>
                 </span>
               )}
             </DialogDescription>
@@ -329,8 +305,8 @@ export const FantasyLeaderboard = () => {
               <thead className="sticky top-0 bg-background">
                 <tr className="border-b">
                   <th className="py-1.5 px-2 text-left font-semibold text-xs">GW</th>
-                  <th className="py-1.5 px-2 text-center font-semibold text-xs">Điểm</th>
-                  <th className="py-1.5 px-2 text-center font-semibold text-xs">Kết quả</th>
+                  <th className="py-1.5 px-2 text-center font-semibold text-xs">Points</th>
+                  <th className="py-1.5 px-2 text-center font-semibold text-xs">Result</th>
                 </tr>
               </thead>
               <tbody>
@@ -341,17 +317,17 @@ export const FantasyLeaderboard = () => {
                     <td className="py-1.5 px-2 text-center">
                       {week.result === 'win' && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-semibold">
-                          🏆 Thắng
+                          🏆 Wins
                         </span>
                       )}
                       {week.result === 'loss' && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs font-semibold">
-                          Thua
+                          Losses
                         </span>
                       )}
                       {week.result === 'mid' && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 text-xs">
-                          Hoà
+                          Draw
                         </span>
                       )}
                     </td>
