@@ -14,6 +14,7 @@ export const ManagerAccordionList = ({
 }: ManagerAccordionListProps) => {
   const [selectedPlayer, setSelectedPlayer] = useState<any | null>(null);
   const [openItems, setOpenItems] = useState<string[]>([]);
+  const [selectedAvatar, setSelectedAvatar] = useState<{ src: string; name: string } | null>(null);
 
   const CHIP_CONFIG: Record<string, { label: string; variant: "secondary" | "destructive" | "default" | "outline" | "success" | "warning" }> = {
     wildcard: { label: "WC", variant: "destructive" },
@@ -149,12 +150,10 @@ export const ManagerAccordionList = ({
 
   const getColorByTeam = (team: string | undefined) => {
     switch (team) {
-      case '87':
+      case 'Vinno':
         return 'text-red-500';
-      case '89':
+      case 'Americano':
         return 'text-violet-500';
-      case '3T':
-        return 'text-amber-500';
       default:
         return 'text-gray-500';
     }
@@ -163,6 +162,25 @@ export const ManagerAccordionList = ({
   return (
     <>
       {renderPlayerDialog()}
+
+      {/* Avatar Preview Dialog */}
+      <Dialog open={!!selectedAvatar} onOpenChange={(open) => !open && setSelectedAvatar(null)}>
+        <DialogContent className="max-w-sm p-2 bg-transparent border-none shadow-none">
+          {selectedAvatar && (
+            <div className="flex flex-col items-center gap-2">
+              <Image
+                src={selectedAvatar.src}
+                alt={selectedAvatar.name}
+                width={300}
+                height={300}
+                className="w-full max-w-[300px] rounded-xl object-cover shadow-2xl"
+                unoptimized
+              />
+              <p className="text-white text-sm font-semibold drop-shadow-lg">{selectedAvatar.name}</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
       <Accordion
         type="multiple"
         // collapsible
@@ -182,28 +200,38 @@ export const ManagerAccordionList = ({
               ? "border-blue-500 dark:border-blue-400"
               : "border-transparent"
               }`}>
-              <AccordionTrigger className="flex py-2 sm:py-3 items-baseline rounded cursor-pointer text-xs sm:text-sm gap-1 sm:gap-2 w-full">
-                {/* ---------------------rank----------------------- */}
-                <div className="w-6 sm:w-10 text-center">
-                  <p>{entry.rank}</p>
-                </div>
-
+              <AccordionTrigger className="flex py-2 sm:py-3 items-center rounded cursor-pointer text-xs sm:text-sm gap-2 w-full">
                 {/* ---------------------team----------------------- */}
-                <div className={`w-8 sm:w-10 text-center ${getColorByTeam(entry.team)}`}>
-                  <p className="text-xs sm:text-sm">{entry.team}</p>
-                  <p className="text-[10px] sm:text-xs hidden sm:block">Team</p>
+                <div className={`w-16 sm:w-20 ${getColorByTeam(entry.team)}`}>
+                  <p className="text-xs sm:text-sm font-semibold truncate">{entry.team}</p>
                 </div>
 
                 {/* ---------------------manager----------------------- */}
-                <div className="flex-1 min-w-0 text-left px-1 sm:px-2">
-                  <p className="truncate text-xs sm:text-sm">{entry.teamName}</p>
-                  <p className="text-muted-foreground truncate text-[10px] sm:text-xs">
-                    {entry.manager}
-                  </p>
+                <div className="flex-1 min-w-0 text-left flex items-center gap-2">
+                  {entry.managerAvatar && (
+                    <Image
+                      src={entry.managerAvatar}
+                      alt={entry.manager}
+                      width={32}
+                      height={32}
+                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all"
+                      unoptimized
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedAvatar({ src: entry.managerAvatar!, name: entry.manager });
+                      }}
+                    />
+                  )}
+                  <div className="min-w-0">
+                    <p className="truncate text-xs sm:text-sm">{entry.teamName}</p>
+                    <p className="text-muted-foreground truncate text-[10px] sm:text-xs">
+                      {entry.manager}
+                    </p>
+                  </div>
                 </div>
 
                 {/* ---------------------Captain----------------------- */}
-                <div className="w-14 sm:w-[5rem] md:w-[6rem] text-center">
+                <div className="w-16 sm:w-20 md:w-24 text-center">
                   {captain && <p className="truncate text-[10px] sm:text-xs">{captain?.elementName}</p>}
                   {viceCaptain && <p className="text-muted-foreground text-[9px] sm:text-[10px] truncate">{viceCaptain?.elementName}</p>}
                 </div>

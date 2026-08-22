@@ -84,6 +84,7 @@ export type LeaderboardEntry = {
   entry: number;
   transfers: Transfer[];
   team: string | undefined;
+  managerAvatar: string | null;
   playedInfo: any;
   picks: PickWithLive[];
   entryHistory: any;

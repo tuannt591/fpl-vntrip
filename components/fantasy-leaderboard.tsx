@@ -52,13 +52,13 @@ const fetchFantasyVntripData = async (
 // Team Config
 const TEAMS: TeamConfig[] = [
   {
-    name: "87 Team",
-    entries: [2195023, 6293111, 6291846, 6400474],
+    name: "Vinno",
+    entries: [2673641, 2799618, 2673983, 3620408],
     color: "text-red-500"
   },
   {
-    name: "89 Team",
-    entries: [4565469, 4550400, 5005626, 6425684],
+    name: "Americano",
+    entries: [1672330, 1640295, 3781088, 4849930],
     color: "text-violet-500"
   }
 ];
@@ -91,11 +91,10 @@ const ManagersSkeleton = () => (
   <>
     {Array.from({ length: 9 }).map((_, index) => (
       <div className='flex items-center gap-2 p-2' key={index}>
-        <Skeleton className="h-6 w-10" />
-        <Skeleton className="h-6 w-10" />
+        <Skeleton className="h-6 w-16 sm:w-20" />
         <Skeleton className="h-6 flex-1" />
-        <Skeleton className="h-6 w-[6rem] px-1" style={{ width: 'calc(100% - 14.5rem)' }} />
-        <Skeleton className="h-6 w-10" />
+        <Skeleton className="h-6 w-16 sm:w-20 md:w-24" />
+        <Skeleton className="h-6 w-10 sm:w-12" />
         <div className="h-6 w-4" />
       </div>
     ))}
@@ -104,12 +103,12 @@ const ManagersSkeleton = () => (
 
 // Team color mapping
 const TEAM_COLORS: Record<string, { text: string; bg: string; border: string }> = {
-  '87': { text: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/30' },
-  '89': { text: 'text-violet-500', bg: 'bg-violet-500/10', border: 'border-violet-500/30' },
+  'Vinno': { text: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/30' },
+  'Americano': { text: 'text-violet-500', bg: 'bg-violet-500/10', border: 'border-violet-500/30' },
 };
 
-// Extract team short name from full name (e.g. "87 Team" -> "87")
-const getTeamShortName = (fullName: string) => fullName.replace(' Team', '');
+// Get team key name for lookups
+const getTeamShortName = (fullName: string) => fullName;
 
 export const FantasyLeaderboard = () => {
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
@@ -255,11 +254,10 @@ export const FantasyLeaderboard = () => {
             <div className="relative">
               {/* Sticky Header */}
               <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 shadow-sm rounded-t-md">
-                <div className="flex gap-1 sm:gap-2 p-2 font-semibold text-xs sm:text-sm border-b">
-                  <div className="w-6 sm:w-10 text-center">Rank</div>
-                  <div className="w-8 sm:w-10 text-center">Team</div>
-                  <div className='flex-1 min-w-0 px-1 sm:px-2'>Manager</div>
-                  <div className="w-14 sm:w-[5rem] md:w-[6rem] text-center">(C)</div>
+                <div className="flex gap-2 p-2 font-semibold text-xs sm:text-sm border-b">
+                  <div className="w-16 sm:w-20">Team</div>
+                  <div className='flex-1 min-w-0'>Manager</div>
+                  <div className="w-16 sm:w-20 md:w-24 text-center">(C)</div>
                   <div className="w-10 sm:w-12 text-center">GW</div>
                   <div className="w-4">&nbsp;</div>
                 </div>

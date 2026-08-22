@@ -1,5 +1,5 @@
 import { PlayerMatchStatus } from '@/types/fantasy';
-import { FPL_API_BASE, TEAMS_CONFIG, WIN_LOSS_START_GW, EXCLUDED_ENTRIES, CACHE_DURATION } from '@/lib/fpl-config';
+import { FPL_API_BASE, TEAMS_CONFIG, WIN_LOSS_START_GW, EXCLUDED_ENTRIES, CACHE_DURATION, MANAGER_AVATARS } from '@/lib/fpl-config';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -879,6 +879,7 @@ export async function GET(request: NextRequest) {
           entry: entryId,
           gwPoint,
           team,
+          managerAvatar: MANAGER_AVATARS[entryId] || null,
           playedInfo,
           transfers,
           activeChip,
