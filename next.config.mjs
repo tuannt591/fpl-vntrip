@@ -1,3 +1,8 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const projectDirectory = path.dirname(fileURLToPath(import.meta.url));
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -18,6 +23,14 @@ const nextConfig = {
         hostname: "github.com",
       },
     ],
+  },
+  webpack: (config) => {
+    config.resolve.alias["openmls_wasm_bg.wasm"] = path.join(
+      projectDirectory,
+      "node_modules/@ermis-network/ermis-chat-sdk/public/openmls_wasm_bg.wasm",
+    );
+
+    return config;
   },
 };
 

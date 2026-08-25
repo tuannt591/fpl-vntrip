@@ -1,9 +1,17 @@
 "use client";
 import React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { MessageCircle } from "lucide-react";
 import { ToggleTheme } from "./toogle-theme";
 
 export const Navbar = () => {
+  const pathname = usePathname();
+
+  if (pathname === "/chat" || pathname.startsWith("/chat/")) {
+    return null;
+  }
+
   return (
     <header className="my-4 container px-2 shadow-inner bg-opacity-15 mx-auto border border-secondary z-40 rounded-2xl flex justify-between items-center p-2 bg-card mb-4">
       <Link href="/" className="font-bold text-lg flex items-center">
@@ -11,7 +19,15 @@ export const Navbar = () => {
 
       </Link>
 
-      <div className="flex">
+      <div className="flex items-center gap-1">
+        <Link
+          href="/chat"
+          aria-label="Mở trang trò chuyện"
+          title="Trò chuyện"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <MessageCircle className="h-5 w-5" />
+        </Link>
         <ToggleTheme />
       </div>
     </header>

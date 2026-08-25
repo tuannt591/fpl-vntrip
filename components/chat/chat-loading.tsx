@@ -1,0 +1,84 @@
+import { Hash, MoreHorizontal, Paperclip, Send } from "lucide-react";
+
+import { ChatBackButton } from "@/components/chat/chat-back-button";
+
+const messageSkeletons = [
+  { side: "left", width: "w-52 sm:w-72" },
+  { side: "right", width: "w-44 sm:w-60" },
+  { side: "left", width: "w-64 sm:w-80" },
+] as const;
+
+export function ChatLoading() {
+  return (
+    <section
+      role="status"
+      aria-label="Đang đồng bộ cuộc trò chuyện"
+      className="relative mx-auto flex h-[100dvh] w-full flex-col overflow-hidden bg-card sm:h-[calc(100dvh-2.25rem)] sm:min-h-0 sm:max-w-5xl sm:rounded-3xl sm:border sm:shadow-[0_24px_70px_-35px_rgba(15,23,42,0.35)] sm:dark:shadow-[0_24px_70px_-35px_rgba(0,0,0,0.8)]"
+    >
+      <div className="absolute inset-x-0 top-0 h-0.5 overflow-hidden bg-primary/10">
+        <div className="h-full w-1/2 animate-pulse rounded-full bg-primary" />
+      </div>
+
+      <header className="flex h-[64px] shrink-0 items-center gap-2 border-b px-2.5 sm:h-[76px] sm:gap-3 sm:px-5">
+        <ChatBackButton />
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary sm:h-10 sm:w-10">
+          <Hash className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="h-3.5 w-36 animate-pulse rounded-full bg-muted" />
+          <div className="h-2.5 w-24 animate-pulse rounded-full bg-muted/70" />
+        </div>
+        <div className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground/50">
+          <MoreHorizontal className="h-5 w-5" />
+        </div>
+      </header>
+
+      <div className="flex flex-1 flex-col overflow-hidden bg-muted/15 px-4 py-6 sm:px-6">
+        <div className="mx-auto mb-8 flex items-center gap-2 rounded-full border bg-background/80 px-3 py-1.5 text-xs text-muted-foreground shadow-sm backdrop-blur">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-50" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+          </span>
+          Đang đồng bộ tin nhắn...
+        </div>
+
+        <div className="space-y-7">
+          {messageSkeletons.map((message, index) => (
+            <div
+              key={`${message.side}-${index}`}
+              className={`flex items-end gap-2.5 ${
+                message.side === "right" ? "justify-end" : "justify-start"
+              }`}
+            >
+              {message.side === "left" && (
+                <div className="h-8 w-8 shrink-0 animate-pulse rounded-full bg-muted" />
+              )}
+              <div
+                className={`${message.width} animate-pulse space-y-2 rounded-2xl px-4 py-3 ${
+                  message.side === "right"
+                    ? "rounded-br-md bg-primary/15"
+                    : "rounded-bl-md bg-muted"
+                }`}
+              >
+                <div className="h-2.5 w-full rounded-full bg-foreground/10" />
+                <div className="h-2.5 w-3/4 rounded-full bg-foreground/10" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <footer className="flex min-h-[76px] shrink-0 items-center gap-3 border-t bg-background px-4 sm:px-6">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground/40">
+          <Paperclip className="h-5 w-5" />
+        </div>
+        <div className="h-11 flex-1 animate-pulse rounded-2xl bg-muted/80" />
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary/50">
+          <Send className="h-4 w-4" />
+        </div>
+      </footer>
+
+      <span className="sr-only">Đang tải kênh và đồng bộ tin nhắn.</span>
+    </section>
+  );
+}

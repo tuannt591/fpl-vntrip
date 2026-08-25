@@ -164,3 +164,556 @@ html {
     display: none; /* Safari and Chrome */
   }
 }
+
+/* Ermis React SDK integration for the single-channel chat page */
+.fpl-ermis-chat .ermis-chat,
+.fpl-ermis-chat .ermis-channel {
+  height: 100%;
+}
+
+.fpl-ermis-chat .ermis-chat {
+  --ermis-accent: hsl(var(--primary));
+  --ermis-accent-hover: hsl(var(--primary) / 0.88);
+  --ermis-radius-md: 0.75rem;
+  --ermis-radius-lg: 1rem;
+}
+
+.fpl-ermis-chat .ermis-channel-header {
+  min-height: 76px;
+  padding-inline: 1.25rem;
+}
+
+/* Chat timeline palette */
+.fpl-ermis-chat .ermis-chat--light {
+  --fpl-timeline-bg: 30 40% 98%;
+  --fpl-timeline-surface: 0 0% 100%;
+  --fpl-timeline-surface-muted: 30 25% 96%;
+  --fpl-timeline-border: 24 14% 88%;
+  --fpl-timeline-shadow: 20 18% 18%;
+  --fpl-timeline-system-bg: 0 0% 100%;
+  --fpl-timeline-system-text: 25 7% 42%;
+  --ermis-bg-primary: hsl(var(--background));
+  --ermis-bg-secondary: hsl(30 25% 97%);
+  --ermis-bg-hover: hsl(var(--primary) / 0.06);
+  --ermis-bg-active: hsl(var(--primary) / 0.1);
+  --ermis-border: hsl(var(--border));
+  --ermis-accent: hsl(var(--primary));
+  --ermis-accent-hover: hsl(var(--primary) / 0.88);
+  --ermis-text-primary: hsl(var(--foreground));
+  --ermis-text-secondary: hsl(25 7% 38%);
+  --ermis-text-muted: hsl(25 6% 46%);
+  --ermis-bubble-own-bg: hsl(var(--primary));
+  --ermis-bubble-own-text: hsl(var(--primary-foreground));
+  --ermis-bubble-other-bg: hsl(var(--fpl-timeline-surface));
+  --ermis-bubble-other-text: hsl(var(--foreground));
+  --ermis-quote-other-bg: hsl(var(--primary) / 0.07);
+  --ermis-quote-other-bg-hover: hsl(var(--primary) / 0.12);
+}
+
+.fpl-ermis-chat .ermis-chat--dark {
+  --fpl-timeline-bg: 20 13% 7%;
+  --fpl-timeline-surface: 20 10% 11%;
+  --fpl-timeline-surface-muted: 20 9% 14%;
+  --fpl-timeline-border: 20 8% 21%;
+  --fpl-timeline-shadow: 0 0% 0%;
+  --fpl-timeline-system-bg: 20 10% 12%;
+  --fpl-timeline-system-text: 24 7% 67%;
+  --ermis-bg-primary: hsl(var(--card));
+  --ermis-bg-secondary: hsl(20 10% 10%);
+  --ermis-bg-hover: hsl(var(--primary) / 0.09);
+  --ermis-bg-active: hsl(var(--primary) / 0.15);
+  --ermis-border: hsl(var(--fpl-timeline-border));
+  --ermis-accent: hsl(var(--primary));
+  --ermis-accent-hover: hsl(24 95% 58%);
+  --ermis-text-primary: hsl(30 15% 94%);
+  --ermis-text-secondary: hsl(24 8% 72%);
+  --ermis-text-muted: hsl(24 6% 61%);
+  --ermis-bubble-own-bg: hsl(var(--primary));
+  --ermis-bubble-own-text: hsl(var(--primary-foreground));
+  --ermis-bubble-other-bg: hsl(var(--fpl-timeline-surface));
+  --ermis-bubble-other-text: hsl(30 15% 94%);
+  --ermis-quote-other-bg: hsl(var(--primary) / 0.1);
+  --ermis-quote-other-bg-hover: hsl(var(--primary) / 0.16);
+}
+
+.fpl-ermis-chat .ermis-message-list {
+  background-color: hsl(var(--fpl-timeline-bg));
+  background-image:
+    radial-gradient(
+      circle at 8% 0%,
+      hsl(var(--primary) / 0.09),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at 92% 100%,
+      hsl(var(--primary) / 0.045),
+      transparent 30%
+    );
+}
+
+.fpl-ermis-chat .ermis-message-list__vlist {
+  padding-block: 1.125rem 0.75rem;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.24) transparent;
+}
+
+.fpl-ermis-chat .ermis-message-list__vlist::-webkit-scrollbar {
+  width: 5px;
+}
+
+.fpl-ermis-chat .ermis-message-list__vlist::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.fpl-ermis-chat .ermis-message-list__vlist::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: hsl(var(--muted-foreground) / 0.22);
+}
+
+.fpl-ermis-chat .ermis-message-group {
+  gap: 0.625rem;
+  padding-top: 0.375rem;
+}
+
+.fpl-ermis-chat .ermis-message-group__messages-col {
+  max-width: min(76%, 38rem);
+}
+
+.fpl-ermis-chat .ermis-message-list__item-user {
+  margin: 0 0.25rem 0.1875rem;
+  color: hsl(var(--primary));
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.fpl-ermis-chat .ermis-message-bubble {
+  padding: 0.5625rem 0.75rem;
+  border: 1px solid transparent;
+  border-radius: 1rem;
+  line-height: 1.45;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.fpl-ermis-chat .ermis-message-bubble--other {
+  border-color: hsl(var(--fpl-timeline-border) / 0.9);
+  box-shadow: 0 7px 20px -16px hsl(var(--fpl-timeline-shadow) / 0.5);
+}
+
+.fpl-ermis-chat .ermis-message-bubble--own {
+  border-color: hsl(var(--primary) / 0.7);
+  box-shadow: 0 9px 22px -17px hsl(var(--primary) / 0.85);
+}
+
+.fpl-ermis-chat
+  .ermis-message-list__bubble-wrapper:hover
+  .ermis-message-bubble--other {
+  border-color: hsl(var(--primary) / 0.25);
+  box-shadow: 0 10px 24px -17px hsl(var(--fpl-timeline-shadow) / 0.58);
+}
+
+.fpl-ermis-chat .ermis-message-list__item-text {
+  line-height: 1.48;
+}
+
+.fpl-ermis-chat .ermis-message-list__item-time {
+  margin-top: 0.35rem;
+  color: var(--ermis-text-muted);
+  font-size: 0.625rem;
+  font-weight: 500;
+  opacity: 0.82;
+}
+
+.fpl-ermis-chat .ermis-message-bubble--own .ermis-message-list__item-time {
+  color: hsl(var(--primary-foreground) / 0.82);
+  opacity: 1;
+}
+
+.fpl-ermis-chat .ermis-message-list__date-separator {
+  padding-block: 0.875rem;
+  margin: 0;
+}
+
+.fpl-ermis-chat .ermis-message-list__date-separator-label {
+  padding: 0.3125rem 0.75rem;
+  border: 1px solid hsl(var(--fpl-timeline-border) / 0.9);
+  border-radius: 999px;
+  background: hsl(var(--fpl-timeline-system-bg) / 0.84);
+  color: hsl(var(--fpl-timeline-system-text));
+  font-size: 0.6875rem;
+  font-weight: 600;
+  box-shadow: 0 6px 18px -14px hsl(var(--fpl-timeline-shadow) / 0.55);
+  backdrop-filter: blur(10px);
+}
+
+.fpl-ermis-chat .ermis-message-list__time-separator {
+  gap: 0.625rem;
+  margin-block: 0.375rem;
+}
+
+.fpl-ermis-chat .ermis-message-list__time-separator::before,
+.fpl-ermis-chat .ermis-message-list__time-separator::after {
+  content: "";
+  width: min(4rem, 12vw);
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsl(var(--fpl-timeline-border) / 0.75)
+  );
+}
+
+.fpl-ermis-chat .ermis-message-list__time-separator::after {
+  transform: rotate(180deg);
+}
+
+.fpl-ermis-chat .ermis-message-list__time-separator-label {
+  padding-inline: 0;
+  color: var(--ermis-text-muted);
+  font-size: 0.625rem;
+}
+
+.fpl-ermis-chat .ermis-message-list__system {
+  padding-block: 0.375rem;
+  margin-block: 0.1875rem;
+}
+
+.fpl-ermis-chat .ermis-message-list__system-text {
+  max-width: min(88%, 34rem);
+  padding: 0.3125rem 0.6875rem;
+  border: 1px solid hsl(var(--fpl-timeline-border) / 0.75);
+  border-radius: 999px;
+  background: hsl(var(--fpl-timeline-system-bg) / 0.72);
+  color: hsl(var(--fpl-timeline-system-text));
+  font-size: 0.6875rem;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: center;
+  box-shadow: 0 6px 18px -16px hsl(var(--fpl-timeline-shadow) / 0.45);
+  backdrop-filter: blur(8px);
+}
+
+.fpl-ermis-chat .ermis-quoted-message {
+  border-left-width: 2px;
+  border-radius: 0.625rem;
+}
+
+.fpl-ermis-chat .ermis-message-reactions__item {
+  min-height: 1.5rem;
+  padding-inline: 0.4375rem;
+  border-color: hsl(var(--fpl-timeline-border));
+  background: hsl(var(--fpl-timeline-surface-muted) / 0.9);
+  box-shadow: 0 4px 12px -10px hsl(var(--fpl-timeline-shadow) / 0.45);
+}
+
+.fpl-ermis-chat .ermis-message-reactions__item--active {
+  border-color: hsl(var(--primary) / 0.55);
+  background: hsl(var(--primary) / 0.12);
+  color: hsl(var(--primary));
+}
+
+.fpl-ermis-chat .ermis-message-list__pinned-indicator {
+  color: hsl(var(--primary));
+  filter: drop-shadow(0 2px 3px hsl(var(--fpl-timeline-shadow) / 0.24));
+}
+
+.fpl-ermis-chat .ermis-pinned-messages {
+  border-color: hsl(var(--fpl-timeline-border));
+  background: hsl(var(--fpl-timeline-system-bg) / 0.88);
+  box-shadow: 0 8px 24px -20px hsl(var(--fpl-timeline-shadow) / 0.6);
+  backdrop-filter: blur(12px);
+}
+
+.fpl-ermis-chat .ermis-message-list__jump-latest {
+  border: 1px solid hsl(var(--primary-foreground) / 0.18);
+  box-shadow: 0 10px 24px -12px hsl(var(--primary) / 0.65);
+}
+
+.fpl-ermis-chat .ermis-typing-indicator {
+  border-color: hsl(var(--fpl-timeline-border));
+  background: hsl(var(--fpl-timeline-system-bg) / 0.94);
+  box-shadow: 0 8px 24px -16px hsl(var(--fpl-timeline-shadow) / 0.55);
+  backdrop-filter: blur(10px);
+}
+
+/* GIPHY messages use the SDK's sticker renderer, so distinguish them by URL. */
+.fpl-ermis-chat
+  .ermis-message-sticker-wrapper:has(
+    .ermis-message-sticker[src*="giphy.com"]
+  ) {
+  display: flex;
+  width: min(220px, 62vw);
+  height: auto;
+  min-height: 8rem;
+  max-height: 16rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: 1rem;
+  background: linear-gradient(
+    145deg,
+    hsl(var(--muted) / 0.55),
+    hsl(var(--background))
+  );
+  box-shadow: 0 10px 24px -18px hsl(var(--foreground) / 0.45);
+}
+
+.fpl-ermis-chat
+  .ermis-message-sticker-wrapper:has(
+    .ermis-message-sticker[src*="giphy.com"]
+  )
+  .ermis-message-sticker {
+  position: static;
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 15.5rem;
+  border-radius: 0.75rem;
+  object-fit: contain;
+}
+
+.fpl-ermis-chat
+  .ermis-message-list__item--sticker:has(
+    .ermis-message-sticker[src*="giphy.com"]
+  )
+  .ermis-message-list__item-time {
+  right: 0.75rem;
+  bottom: 0.75rem;
+  border: 1px solid hsl(var(--border) / 0.75);
+  background: hsl(var(--background) / 0.88);
+  color: hsl(var(--foreground) / 0.72);
+  box-shadow: 0 4px 12px hsl(var(--foreground) / 0.12);
+  text-shadow: none;
+  backdrop-filter: blur(6px);
+}
+
+/* Custom message action toolbar */
+.fpl-ermis-chat .fpl-message-actions {
+  position: absolute;
+  top: 50%;
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0.1875rem;
+  border: 1px solid hsl(var(--border) / 0.9);
+  border-radius: 9999px;
+  background: hsl(var(--background) / 0.92);
+  box-shadow: 0 8px 24px -14px hsl(var(--foreground) / 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) scale(0.96);
+  transition: opacity 150ms ease, transform 150ms ease;
+  backdrop-filter: blur(10px);
+}
+
+.fpl-ermis-chat .fpl-message-actions::before {
+  content: "";
+  position: absolute;
+  top: -0.375rem;
+  bottom: -0.375rem;
+  width: 0.75rem;
+}
+
+.fpl-ermis-chat
+  .ermis-message-list__item--own
+  .fpl-message-actions {
+  right: calc(100% + 0.5rem);
+  flex-direction: row-reverse;
+}
+
+.fpl-ermis-chat
+  .ermis-message-list__item--own
+  .fpl-message-actions::before {
+  left: 100%;
+}
+
+.fpl-ermis-chat
+  .ermis-message-list__item--other
+  .fpl-message-actions {
+  left: calc(100% + 0.5rem);
+}
+
+.fpl-ermis-chat
+  .ermis-message-list__item--other
+  .fpl-message-actions::before {
+  right: 100%;
+}
+
+.fpl-ermis-chat
+  .ermis-message-list__bubble-wrapper:hover
+  .fpl-message-actions,
+.fpl-ermis-chat .fpl-message-actions:focus-within,
+.fpl-ermis-chat .fpl-message-actions--active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%) scale(1);
+}
+
+.fpl-ermis-chat .fpl-message-actions__button,
+.fpl-ermis-chat
+  .fpl-message-actions
+  .ermis-message-list__actions-trigger {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 9999px;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease,
+    transform 120ms ease;
+}
+
+.fpl-ermis-chat .fpl-message-actions__button:hover,
+.fpl-ermis-chat .fpl-message-actions__button--active,
+.fpl-ermis-chat
+  .fpl-message-actions
+  .ermis-message-list__actions-trigger:hover:not(:disabled),
+.fpl-ermis-chat
+  .fpl-message-actions
+  .ermis-message-list__actions-trigger--active {
+  background: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+}
+
+.fpl-ermis-chat .fpl-message-actions__button:active,
+.fpl-ermis-chat
+  .fpl-message-actions
+  .ermis-message-list__actions-trigger:active {
+  transform: scale(0.92);
+}
+
+.fpl-message-actions-dropdown {
+  animation: fpl-message-actions-in 140ms ease-out;
+}
+
+@keyframes fpl-message-actions-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.25rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .fpl-ermis-chat .fpl-message-actions {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-50%) scale(0.92);
+    backdrop-filter: none;
+  }
+
+  .fpl-ermis-chat
+    .ermis-message-list__bubble-wrapper:hover
+    .fpl-message-actions,
+  .fpl-ermis-chat .fpl-message-actions:focus-within,
+  .fpl-ermis-chat .fpl-message-actions--active {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(-50%) scale(1);
+  }
+
+  .fpl-ermis-chat .fpl-message-actions__reply,
+  .fpl-ermis-chat .fpl-message-actions .ermis-qr-wrapper {
+    display: none !important;
+  }
+
+  .fpl-ermis-chat .fpl-message-actions__button {
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 1px solid hsl(var(--border) / 0.85);
+    background: hsl(var(--background) / 0.9);
+    box-shadow: 0 5px 16px -10px hsl(var(--foreground) / 0.45);
+  }
+
+  .fpl-ermis-chat
+    .ermis-message-list__item--own
+    .fpl-message-actions {
+    right: calc(100% + 0.25rem);
+  }
+
+  .fpl-ermis-chat
+    .ermis-message-list__item--other
+    .fpl-message-actions {
+    left: calc(100% + 0.25rem);
+  }
+}
+
+.fpl-ermis-chat .ermis-message-input {
+  padding: 0.75rem 1rem;
+  overflow: visible;
+  z-index: 20;
+}
+
+.fpl-ermis-chat .ermis-message-input__row,
+.fpl-ermis-chat .ermis-message-input__editable-wrapper {
+  min-width: 0;
+  align-items: flex-end;
+}
+
+.fpl-ermis-chat .ermis-message-input__editable {
+  min-height: 2.5rem;
+  max-height: 7rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.fpl-ermis-chat .ermis-message-input__editable::-webkit-scrollbar {
+  width: 4px;
+}
+
+.fpl-ermis-chat .ermis-message-input__editable::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: hsl(var(--muted-foreground) / 0.3);
+}
+
+@media (max-width: 640px) {
+  .fpl-ermis-chat .ermis-channel-header {
+    padding-inline: 1rem;
+  }
+
+  .fpl-ermis-chat .ermis-message-list__vlist {
+    padding-inline: 0.75rem;
+  }
+
+  .fpl-ermis-chat .ermis-message-group {
+    gap: 0.5rem;
+  }
+
+  .fpl-ermis-chat .ermis-message-group__messages-col {
+    max-width: min(84%, 32rem);
+  }
+
+  .fpl-ermis-chat .ermis-message-bubble {
+    padding: 0.5rem 0.6875rem;
+  }
+
+  .fpl-ermis-chat .ermis-message-list__system-text {
+    max-width: 92%;
+  }
+
+  .fpl-ermis-chat .ermis-message-input {
+    padding-inline: 0.75rem;
+  }
+
+  .fpl-ermis-chat .ermis-message-input__editable {
+    max-height: 6.5rem;
+  }
+}
