@@ -1,5 +1,6 @@
 # Fantasy Premier League Leaderboard – FPL Vntrip
 
+
 A modern web application to view and track Fantasy Premier League (FPL)
 leaderboards with detailed team statistics, live player information, and weekly
 team win/loss tracking.
