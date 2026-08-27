@@ -5,8 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Skeleton } from "./ui/skeleton";
 import { ManagerAccordionList } from './ui/manager-accordion-list';
+import { Button } from './ui/button';
 import { LeaderboardEntry, TeamConfig, TeamStats, TeamWeeklyData } from '@/types/fantasy';
 import { VNTRIP_LEAGUE_ID, CURRENT_PHASE } from '@/lib/fpl-config';
+import Link from 'next/link';
 
 const fetchFantasyVntripData = async (
   leagueId: string,
@@ -177,6 +179,23 @@ export const FantasyLeaderboard = () => {
     <div className="container mx-auto py-4 px-2">
       <Card className='border-none shadow-none bg-transparent'>
         <CardHeader className='px-0 pt-0'>
+          <div className="mb-3 grid grid-cols-2 gap-2 rounded-xl bg-muted p-1">
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+            >
+              Bảng xếp hạng
+            </Button>
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+            >
+              <Link href="/h2h">Head-to-Head</Link>
+            </Button>
+          </div>
+
           <div className="flex items-center justify-between gap-2">
             <div>
               Gameweek:&nbsp;

@@ -2,7 +2,8 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Swords } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { ToggleTheme } from "./toogle-theme";
 
 export const Navbar = () => {
@@ -20,6 +21,17 @@ export const Navbar = () => {
       </Link>
 
       <div className="flex items-center gap-1">
+        <Link
+          href="/h2h"
+          aria-label="Mở H2H Arena"
+          title="Head-to-Head"
+          className={cn(
+            "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            pathname === "/h2h" && "bg-primary/10 text-primary",
+          )}
+        >
+          <Swords className="h-5 w-5" />
+        </Link>
         <Link
           href="/chat"
           aria-label="Mở trang trò chuyện"

@@ -31,3 +31,7 @@ export const CACHE_DURATION = 60 * 1000;
 // League config
 export const VNTRIP_LEAGUE_ID = '529755';
 export const CURRENT_PHASE = 1;
+
+// FPL entry IDs are season-specific, so every claim and H2H record must carry
+// the season it belongs to. Override this at deploy time for a new season.
+export const FPL_SEASON = process.env.FPL_SEASON || '2026-27';

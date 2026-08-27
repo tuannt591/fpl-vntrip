@@ -75,7 +75,7 @@ function AuthFeedback({ feedback }: { feedback: AuthFeedbackData | null }) {
 export function EmailLogin({
   onAuthenticated,
 }: {
-  onAuthenticated: (session: AuthSession) => void;
+  onAuthenticated: (session: AuthSession) => void | Promise<void>;
 }) {
   const { resolvedTheme, setTheme } = useTheme();
   const [email, setEmail] = useState("");
@@ -164,7 +164,7 @@ export function EmailLogin({
         throw new Error("Ermis không trả về token đăng nhập.");
       }
 
-      onAuthenticated({
+      await onAuthenticated({
         token,
         refreshToken: response.refresh_token,
         userId: response.user_id || response.user?.id,
