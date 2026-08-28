@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { H2HPanel } from "@/components/h2h/h2h-panel";
+import { APP_SESSION_COOKIE, readAppSessionToken } from "@/lib/auth/app-session";
 
 export const metadata: Metadata = {
   title: "H2H Arena - FPL Vntrip",
@@ -10,9 +13,15 @@ export const metadata: Metadata = {
     "Tạo nhóm Head-to-Head, so điểm gameweek và theo dõi thành tích FPL Vntrip.",
 };
 
-export default function H2HPage() {
+export default async function H2HPage() {
+  const session = await readAppSessionToken(
+    cookies().get(APP_SESSION_COOKIE)?.value,
+  );
+
+  if (!session) redirect("/login?next=%2Fh2h");
+
   return (
-    <main className="container mx-auto max-w-2xl px-3 pb-10 pt-0 sm:px-4">
+    <main className="container mx-auto min-h-[100dvh] max-w-2xl px-3 pb-[calc(3rem+env(safe-area-inset-bottom))] pt-0 sm:px-4">
       <div className="mb-4 flex items-center gap-3">
           <Link
             href="/"

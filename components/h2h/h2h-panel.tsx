@@ -1,15 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
   Loader2,
-  LogIn,
   ShieldCheck,
-  Swords,
   UserCheck,
 } from "lucide-react";
 
@@ -21,9 +19,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import {
   Dialog,
@@ -50,6 +45,43 @@ type ManagerOptionsResponse = {
 
 type ViewState = "loading" | "anonymous" | "ready" | "error";
 
+const MANAGER_CLAIM_STORAGE_KEY = "fpl-vntrip:h2h-manager-claim";
+
+function getCachedManagerClaim(
+  profileId: string,
+  season: string,
+  leagueId: string,
+): ClaimedManager | null {
+  try {
+    const value = window.sessionStorage.getItem(MANAGER_CLAIM_STORAGE_KEY);
+    if (!value) return null;
+
+    const manager = JSON.parse(value) as Partial<ClaimedManager>;
+    if (
+      manager.profileId !== profileId ||
+      manager.season !== season ||
+      manager.leagueId !== leagueId ||
+      typeof manager.id !== "string" ||
+      typeof manager.entryId !== "number" ||
+      typeof manager.managerName !== "string" ||
+      typeof manager.teamName !== "string"
+    ) {
+      return null;
+    }
+
+    return manager as ClaimedManager;
+  } catch {
+    return null;
+  }
+}
+
+function cacheManagerClaim(manager: ClaimedManager) {
+  window.sessionStorage.setItem(
+    MANAGER_CLAIM_STORAGE_KEY,
+    JSON.stringify(manager),
+  );
+}
+
 function ManagerAvatar({ manager }: { manager: H2HManagerOption }) {
   if (manager.managerAvatar) {
     return (
@@ -72,6 +104,7 @@ function ManagerAvatar({ manager }: { manager: H2HManagerOption }) {
 }
 
 export function H2HPanel() {
+  const router = useRouter();
   const [viewState, setViewState] = useState<ViewState>("loading");
   const [data, setData] = useState<ManagerOptionsResponse | null>(null);
   const [selectedEntryId, setSelectedEntryId] = useState<number | null>(null);
@@ -84,8 +117,12 @@ export function H2HPanel() {
     setErrorMessage("");
 
     try {
-      const response = await fetch("/api/h2h/managers", {
-        headers: { Accept: "application/json" },
+      const response = await fetch(`/api/h2h/managers?refresh=${Date.now()}`, {
+        headers: {
+          Accept: "application/json",
+          "Cache-Control": "no-cache",
+        },
+        cache: "no-store",
       });
       if (response.status === 401) {
         setViewState("anonymous");
@@ -103,7 +140,27 @@ export function H2HPanel() {
         );
       }
 
-      setData(responseData);
+      const cachedManager = getCachedManagerClaim(
+        responseData.profile.id,
+        responseData.season,
+        responseData.leagueId,
+      );
+      const myManager = responseData.myManager || cachedManager;
+
+      if (responseData.myManager) cacheManagerClaim(responseData.myManager);
+
+      setData({
+        ...responseData,
+        myManager,
+        managers: myManager
+          ? responseData.managers.map((manager) => ({
+              ...manager,
+              claimed:
+                manager.claimed || manager.entryId === myManager.entryId,
+              claimedByMe: manager.entryId === myManager.entryId,
+            }))
+          : responseData.managers,
+      });
       setViewState("ready");
     } catch (error) {
       setErrorMessage(
@@ -116,6 +173,12 @@ export function H2HPanel() {
   useEffect(() => {
     void loadManagerOptions();
   }, [loadManagerOptions]);
+
+  useEffect(() => {
+    if (viewState === "anonymous") {
+      router.replace("/login?next=%2Fh2h");
+    }
+  }, [router, viewState]);
 
   const selectedManager =
     data?.managers.find((manager) => manager.entryId === selectedEntryId) ?? null;
@@ -142,6 +205,8 @@ export function H2HPanel() {
         throw new Error(responseData.error || "Không thể claim manager.");
       }
 
+      cacheManagerClaim(responseData.manager);
+
       setData((current) =>
         current
           ? {
@@ -159,6 +224,12 @@ export function H2HPanel() {
       );
       setSelectedEntryId(null);
       setClaimDialogOpen(false);
+      window.dispatchEvent(
+        new CustomEvent("fpl-vntrip:manager-claimed", {
+          detail: { managerAvatar: responseData.manager.managerAvatar },
+        }),
+      );
+      router.refresh();
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Không thể claim manager.",
@@ -181,38 +252,8 @@ export function H2HPanel() {
 
   if (viewState === "anonymous") {
     return (
-      <div className="mx-auto grid min-h-[520px] max-w-4xl items-center gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="relative overflow-hidden rounded-3xl bg-slate-950 p-7 text-white sm:p-10">
-          <div className="pointer-events-none absolute -right-20 -top-20 h-60 w-60 rounded-full bg-violet-500/25 blur-3xl" />
-          <Swords className="relative h-10 w-10 text-violet-300" />
-          <h1 className="relative mt-7 text-3xl font-black tracking-tight sm:text-4xl">
-            Tạo kèo. So điểm.
-            <br />
-            Đứng đầu nhóm.
-          </h1>
-          <p className="relative mt-4 max-w-md text-sm leading-6 text-slate-400">
-            Chọn nhiều manager trong cùng một gameweek và xem ai có đội hình hiệu
-            quả nhất khi vòng đấu kết thúc.
-          </p>
-        </div>
-
-        <Card className="rounded-3xl">
-          <CardHeader>
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <LogIn className="h-6 w-6" />
-            </div>
-            <CardTitle className="pt-3 text-xl">Đăng nhập để chơi H2H</CardTitle>
-            <CardDescription className="leading-6">
-              Dùng tài khoản Chat hiện tại để xác thực, sau đó claim manager FPL
-              của bạn.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild className="w-full rounded-xl">
-              <Link href="/chat?next=%2Fh2h">Đăng nhập bằng Chat</Link>
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="flex min-h-[420px] items-center justify-center">
+        <Loader2 className="h-7 w-7 animate-spin text-primary" />
       </div>
     );
   }

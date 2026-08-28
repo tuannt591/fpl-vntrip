@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   Check,
+  CheckCircle2,
   ChevronRight,
   Clock3,
   Crown,
@@ -161,6 +162,24 @@ function MatchCard({
   canDelete: boolean;
   onDelete: () => void;
 }) {
+  const [showAllParticipants, setShowAllParticipants] = useState(false);
+  const myParticipant = match.participants.find(
+    (participant) => participant.manager.entryId === myEntryId,
+  );
+  const compactParticipants = match.participants.slice(0, 3);
+
+  if (
+    myParticipant &&
+    !compactParticipants.some((participant) => participant.id === myParticipant.id)
+  ) {
+    compactParticipants[compactParticipants.length - 1] = myParticipant;
+  }
+
+  const visibleParticipants = showAllParticipants
+    ? match.participants
+    : compactParticipants;
+  const hiddenParticipantCount = match.participants.length - compactParticipants.length;
+
   return (
     <article className="overflow-hidden rounded-2xl border bg-card">
       <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
@@ -191,7 +210,7 @@ function MatchCard({
       </div>
 
       <div className="divide-y px-4">
-        {match.participants.map((participant) => {
+        {visibleParticipants.map((participant) => {
           const isMe = participant.manager.entryId === myEntryId;
           const isWinner =
             participant.result === "winner" ||
@@ -201,7 +220,7 @@ function MatchCard({
             <div
               key={participant.id}
               className={cn(
-                "flex items-center gap-2.5 py-2.5",
+                "flex items-center gap-2.5 py-2",
                 isMe && "-mx-1 rounded-lg bg-primary/[0.045] px-1",
               )}
             >
@@ -239,6 +258,24 @@ function MatchCard({
           );
         })}
       </div>
+
+      {hiddenParticipantCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowAllParticipants((current) => !current)}
+          className="flex w-full items-center justify-center gap-1.5 border-t px-4 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+        >
+          {showAllParticipants
+            ? "Thu gọn danh sách"
+            : `Xem thêm ${hiddenParticipantCount} người`}
+          <ChevronRight
+            className={cn(
+              "h-3.5 w-3.5 transition-transform",
+              showAllParticipants && "rotate-90",
+            )}
+          />
+        </button>
+      )}
     </article>
   );
 }
@@ -270,11 +307,13 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
   const [selectedEntryIds, setSelectedEntryIds] = useState<number[]>([]);
   const [matchFilter, setMatchFilter] = useState<"mine" | "all">("mine");
   const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [pickerErrorMessage, setPickerErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteMatch, setDeleteMatch] = useState<H2HGroupMatch | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   const loadMatches = useCallback(async () => {
     setIsLoading(true);
@@ -307,6 +346,13 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
     void loadMatches();
   }, [loadMatches]);
 
+  useEffect(() => {
+    if (!successMessage) return;
+
+    const timeoutId = window.setTimeout(() => setSuccessMessage(""), 4000);
+    return () => window.clearTimeout(timeoutId);
+  }, [successMessage]);
+
   const matches = matchesData?.matches ?? EMPTY_MATCHES;
   const myMatches = useMemo(
     () =>
@@ -336,7 +382,7 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
     match.gameweek === matchesData?.gameweek.creationGameweek &&
     Boolean(
       matchesData?.gameweek.creationDeadlineTime &&
-        Date.parse(matchesData.gameweek.creationDeadlineTime) > Date.now(),
+      Date.parse(matchesData.gameweek.creationDeadlineTime) > Date.now(),
     );
 
   const toggleManager = (entryId: number) => {
@@ -345,14 +391,14 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
         ? current.filter((item) => item !== entryId)
         : [...current, entryId],
     );
-    setErrorMessage("");
+    setPickerErrorMessage("");
   };
 
   const createMatch = async () => {
     if (selectedEntryIds.length === 0 || isCreating) return;
 
     setIsCreating(true);
-    setErrorMessage("");
+    setPickerErrorMessage("");
     try {
       const response = await fetch("/api/h2h/matches", {
         method: "POST",
@@ -373,9 +419,10 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
       setSelectedEntryIds([]);
       setIsPickerOpen(false);
       setMatchFilter("mine");
+      setSuccessMessage("Đã tạo nhóm H2H thành công.");
       await loadMatches();
     } catch (error) {
-      setErrorMessage(
+      setPickerErrorMessage(
         error instanceof Error ? error.message : "Không thể tạo trận H2H.",
       );
     } finally {
@@ -461,6 +508,22 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
         </div>
       )}
 
+      {successMessage && (
+        <div className="flex items-start justify-between gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.06] p-3 text-sm text-emerald-700 dark:text-emerald-400">
+          <span className="flex items-start gap-2">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+            {successMessage}
+          </span>
+          <button
+            type="button"
+            onClick={() => setSuccessMessage("")}
+            aria-label="Đóng thông báo thành công"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       <section className="rounded-2xl border bg-card p-4 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -475,7 +538,10 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
             size="sm"
             className="gap-1.5 rounded-xl"
             disabled={!canCreate || isLoading}
-            onClick={() => setIsPickerOpen(true)}
+            onClick={() => {
+              setPickerErrorMessage("");
+              setIsPickerOpen(true);
+            }}
           >
             <Plus className="h-4 w-4" /> Tạo nhóm
           </Button>
@@ -545,16 +611,28 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
         )}
       </section>
 
-      <Dialog open={isPickerOpen} onOpenChange={setIsPickerOpen}>
+      <Dialog
+        open={isPickerOpen}
+        onOpenChange={(open) => {
+          setIsPickerOpen(open);
+          if (!open) setPickerErrorMessage("");
+        }}
+      >
         <DialogContent className="flex max-h-[86dvh] max-w-md flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:rounded-2xl">
           <DialogHeader className="border-b px-5 pb-4 pt-5">
             <DialogTitle>Chọn đối thủ</DialogTitle>
             <DialogDescription>
-              Bạn được tự động thêm vào nhóm. Có thể chọn nhiều người.
+              Có thể chọn nhiều người.
             </DialogDescription>
           </DialogHeader>
 
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            {pickerErrorMessage && (
+              <div className="mb-3 flex items-start gap-2 rounded-xl border border-destructive/25 bg-destructive/[0.05] px-3 py-2 text-xs leading-5 text-destructive">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{pickerErrorMessage}</span>
+              </div>
+            )}
             {selectedManagers.length > 0 && (
               <div className="mb-3 flex flex-wrap gap-1.5 px-1">
                 {selectedManagers.map((manager) => (

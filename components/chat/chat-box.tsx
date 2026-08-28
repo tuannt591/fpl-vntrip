@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Hash, LogOut, Moon, Paperclip, Send, Sun } from "lucide-react";
+import { Paperclip, Send } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import type { Channel as CoreChannel } from "@ermis-network/ermis-chat-sdk";
@@ -64,12 +64,10 @@ function HiddenVoiceRecordButton() {
 
 function ChatChannel({
   channel,
-  onLogout,
 }: {
   channel: CoreChannel;
-  onLogout: () => void;
 }) {
-  const { resolvedTheme, setTheme: setAppTheme } = useTheme();
+  const { resolvedTheme } = useTheme();
   const { setActiveChannel, setTheme: setChatTheme } = useChatClient();
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [chatLanguage, setChatLanguage] = useState<ChatLanguage>("vi");
@@ -79,10 +77,6 @@ function ChatChannel({
       ? channelMemberCount
       : Object.keys(channel.state.members).length;
   const channelName = channel.data?.name || "Kênh FPL Vntrip";
-  const channelImage =
-    typeof channel.data?.image === "string" && channel.data.image.trim()
-      ? channel.data.image
-      : null;
 
   useEffect(() => {
     setActiveChannel(channel);
@@ -125,18 +119,12 @@ function ChatChannel({
       <header className="flex min-h-[64px] shrink-0 items-center gap-2 border-b bg-background px-2.5 sm:min-h-[76px] sm:gap-3 sm:px-5">
         <ChatBackButton />
         <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-primary sm:h-10 sm:w-10">
-          {channelImage ? (
-            // The channel image host is configured by Ermis at runtime.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={channelImage}
-              alt={`Ảnh đại diện ${channelName}`}
-              className="h-full w-full object-cover"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <Hash className="h-4 w-4 sm:h-5 sm:w-5" />
-          )}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/vntrip-ava.png"
+            alt="Ảnh đại diện Vntrip"
+            className="h-full w-full object-cover"
+          />
         </div>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-sm font-semibold sm:text-base">
@@ -146,41 +134,6 @@ function ChatChannel({
             {memberCount} thành viên
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() =>
-            setAppTheme(resolvedTheme === "dark" ? "light" : "dark")
-          }
-          aria-label={
-            resolvedTheme === "dark"
-              ? "Chuyển sang giao diện sáng"
-              : "Chuyển sang giao diện tối"
-          }
-          title={
-            resolvedTheme === "dark"
-              ? "Giao diện sáng"
-              : "Giao diện tối"
-          }
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:h-10 sm:w-10"
-        >
-          {resolvedTheme === "dark" ? (
-            <Sun className="h-[18px] w-[18px]" />
-          ) : (
-            <Moon className="h-[18px] w-[18px]" />
-          )}
-        </button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={onLogout}
-          aria-label="Đăng xuất"
-          title="Đăng xuất"
-          className="h-10 shrink-0 gap-2 rounded-full px-3 text-muted-foreground"
-        >
-          <LogOut className="h-4 w-4" />
-          <span className="hidden sm:inline">Đăng xuất</span>
-        </Button>
       </header>
 
       <VirtualMessageList
@@ -234,17 +187,15 @@ function ChatChannel({
 
 export function ChatBox({
   channel,
-  onLogout,
 }: {
   channel: CoreChannel;
-  onLogout: () => void;
 }) {
   const client = channel.getClient();
 
   return (
     <section className="fpl-ermis-chat relative mx-auto h-[100dvh] w-full overflow-hidden bg-card sm:h-[calc(100dvh-2.25rem)] sm:min-h-0 sm:max-w-5xl sm:rounded-3xl sm:border sm:shadow-[0_24px_70px_-35px_rgba(15,23,42,0.35)] sm:dark:shadow-[0_24px_70px_-35px_rgba(0,0,0,0.8)]">
       <ChatProvider client={client} initialTheme="light">
-        <ChatChannel channel={channel} onLogout={onLogout} />
+        <ChatChannel channel={channel} />
       </ChatProvider>
     </section>
   );

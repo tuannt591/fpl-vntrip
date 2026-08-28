@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
-  Hash,
   Loader2,
   LogIn,
   LogOut,
@@ -166,10 +165,7 @@ export function ChannelGate({
 
   if (status === "chat" && channel && userId) {
     return (
-      <ChatBox
-        channel={channel}
-        onLogout={() => void handleLogout()}
-      />
+      <ChatBox channel={channel} />
     );
   }
 
@@ -202,10 +198,6 @@ export function ChannelGate({
   }
 
   const channelName = channel?.data?.name || "Kênh FPL Vntrip";
-  const channelImage =
-    typeof channel?.data?.image === "string" && channel.data.image.trim()
-      ? channel.data.image
-      : null;
   const channelDescription =
     typeof channel?.data?.description === "string" &&
       channel.data.description.trim()
@@ -225,18 +217,12 @@ export function ChannelGate({
       <div className="pointer-events-none absolute -right-20 -top-28 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
       <div className="relative w-full max-w-md text-center">
         <div className="mx-auto flex h-20 w-20 items-center justify-center overflow-hidden rounded-3xl bg-primary/10 text-primary ring-4 ring-background shadow-md">
-          {channelImage ? (
-            // The channel image host is configured by Ermis at runtime.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={channelImage}
-              alt={`Ảnh đại diện ${channelName}`}
-              className="h-full w-full object-cover"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <Hash className="h-8 w-8" />
-          )}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/vntrip-ava.png"
+            alt="Ảnh đại diện Vntrip"
+            className="h-full w-full object-cover"
+          />
         </div>
         <p className="mt-6 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
           Kênh công khai

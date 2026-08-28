@@ -36,6 +36,10 @@ export async function GET(request: NextRequest) {
       profile: identity.profile,
       myManager,
       managers: options,
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, max-age=0',
+      },
     });
   } catch (error) {
     console.error('[H2H] Unable to load manager claim options:', error);

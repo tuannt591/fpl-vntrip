@@ -179,20 +179,23 @@ export const FantasyLeaderboard = () => {
     <div className="container mx-auto py-4 px-2">
       <Card className='border-none shadow-none bg-transparent'>
         <CardHeader className='px-0 pt-0'>
-          <div className="mb-3 grid grid-cols-2 gap-2 rounded-xl bg-muted p-1">
+          <div className="mb-3 grid grid-cols-3 gap-2 rounded-xl bg-muted p-1">
             <Button
               type="button"
               variant="default"
               size="sm"
             >
-              Bảng xếp hạng
+              BXH
             </Button>
             <Button
               asChild
               variant="ghost"
               size="sm"
             >
-              <Link href="/h2h">Head-to-Head</Link>
+              <Link href="/h2h">H2H</Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/chat">Chat</Link>
             </Button>
           </div>
 

@@ -13,12 +13,9 @@ import {
   CheckCircle2,
   Loader2,
   Mail,
-  Moon,
   RefreshCw,
   ShieldCheck,
-  Sun,
 } from "lucide-react";
-import { useTheme } from "next-themes";
 
 import type { ErmisAuthProvider } from "@ermis-network/ermis-chat-sdk";
 
@@ -77,7 +74,6 @@ export function EmailLogin({
 }: {
   onAuthenticated: (session: AuthSession) => void | Promise<void>;
 }) {
-  const { resolvedTheme, setTheme } = useTheme();
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState<string[]>(createEmptyOtp);
   const [step, setStep] = useState<"email" | "otp">("email");
@@ -254,42 +250,21 @@ export function EmailLogin({
       <div className="pointer-events-none absolute -right-20 -top-28 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
       <div className="relative grid min-h-[100dvh] grid-rows-[auto_1fr] sm:h-full sm:min-h-0 md:grid-cols-[minmax(17rem,0.85fr)_minmax(0,1.15fr)] md:grid-rows-1">
         <div className="border-b bg-primary/[0.06] p-5 sm:p-6 md:flex md:flex-col md:border-b-0 md:border-r md:p-8 lg:p-10">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
             <ChatBackButton className="-ml-2" />
-            <button
-              type="button"
-              onClick={() =>
-                setTheme(resolvedTheme === "dark" ? "light" : "dark")
-              }
-              aria-label={
-                resolvedTheme === "dark"
-                  ? "Chuyển sang giao diện sáng"
-                  : "Chuyển sang giao diện tối"
-              }
-              title={
-                resolvedTheme === "dark"
-                  ? "Giao diện sáng"
-                  : "Giao diện tối"
-              }
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {resolvedTheme === "dark" ? (
-                <Sun className="h-[17px] w-[17px]" />
-              ) : (
-                <Moon className="h-[17px] w-[17px]" />
-              )}
-            </button>
+            <div>
+              <p className="hidden text-xs font-semibold uppercase tracking-[0.16em] text-primary md:block">
+                FPL Vntrip
+              </p>
+              <h1 className="text-xl font-bold tracking-tight md:mt-1 md:text-2xl">
+                Đăng nhập bằng email
+              </h1>
+            </div>
           </div>
 
-          <div className="mt-4 md:my-auto md:py-8">
-            <p className="hidden text-xs font-semibold uppercase tracking-[0.16em] text-primary md:block">
-              Kênh trò chuyện cộng đồng
-            </p>
-            <h1 className="text-xl font-bold tracking-tight md:mt-3 md:max-w-sm md:text-3xl md:leading-tight">
-              Đăng nhập bằng email
-            </h1>
-            <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground md:mt-4 md:text-[15px]">
-              Nhập email để nhận mã OTP và tham gia kênh trò chuyện.
+          <div className="mt-2 md:my-auto md:py-8">
+            <p className="max-w-sm text-sm leading-6 text-muted-foreground md:text-[15px]">
+              Đăng nhập để sử dụng Chat và H2H.
             </p>
 
             <div className="mt-7 hidden space-y-3 md:block">
@@ -303,7 +278,7 @@ export function EmailLogin({
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <ShieldCheck className="h-4 w-4" />
                 </span>
-                <span>Đăng nhập nhanh, không cần mật khẩu</span>
+                <span>Một tài khoản cho cả Chat và H2H</span>
               </div>
             </div>
           </div>
