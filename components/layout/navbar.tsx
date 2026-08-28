@@ -37,6 +37,21 @@ export const Navbar = () => {
 
     const loadProfile = async () => {
       try {
+        const storedSession =
+          window.localStorage.getItem(AUTH_STORAGE_KEY) ||
+          window.sessionStorage.getItem(AUTH_STORAGE_KEY);
+        if (!storedSession) return;
+
+        const session = JSON.parse(storedSession) as {
+          token?: unknown;
+          email?: unknown;
+        };
+        if (typeof session.token !== "string" || typeof session.email !== "string") {
+          window.localStorage.removeItem(AUTH_STORAGE_KEY);
+          window.sessionStorage.removeItem(AUTH_STORAGE_KEY);
+          return;
+        }
+
         const response = await fetch("/api/auth/me");
         if (!response.ok) return;
 
