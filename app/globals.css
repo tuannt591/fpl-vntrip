@@ -166,6 +166,89 @@ html {
   }
 }
 
+@keyframes fpl-player-card-focus {
+  0% { transform: scale(0.98); }
+  55% { transform: scale(1.025); }
+  100% { transform: scale(1); }
+}
+
+@keyframes fpl-player-detail-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fpl-player-score-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(5px) scale(0.92);
+  }
+  70% { transform: translateY(0) scale(1.04); }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.fpl-player-card {
+  -webkit-tap-highlight-color: transparent;
+  will-change: transform;
+}
+
+.fpl-player-card:active {
+  transform: scale(0.97);
+}
+
+.fpl-player-card[data-selected="true"] {
+  animation: fpl-player-card-focus 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-hero {
+  animation: fpl-player-detail-reveal 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-score {
+  animation: fpl-player-score-pop 300ms 90ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-fixture,
+.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-stats,
+.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-extra {
+  animation: fpl-player-detail-reveal 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-fixture { animation-delay: 110ms; }
+.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-stats { animation-delay: 145ms; }
+.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-extra { animation-delay: 180ms; }
+
+.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-stat {
+  animation: fpl-player-detail-reveal 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-stat:nth-child(1) { animation-delay: 190ms; }
+.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-stat:nth-child(2) { animation-delay: 225ms; }
+.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-stat:nth-child(3) { animation-delay: 260ms; }
+.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-stat:nth-child(4) { animation-delay: 295ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fpl-player-card,
+  .fpl-player-card[data-selected="true"],
+  .fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-hero,
+  .fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-score,
+  .fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-fixture,
+  .fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-stats,
+  .fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-extra,
+  .fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-stat {
+    animation: none;
+    transition-duration: 0.01ms;
+  }
+}
+
 /* Ermis React SDK integration for the single-channel chat page */
 .fpl-ermis-chat .ermis-chat {
   display: flex;
@@ -211,6 +294,7 @@ html {
   --ermis-bubble-other-text: hsl(var(--foreground));
   --ermis-quote-other-bg: hsl(var(--primary) / 0.07);
   --ermis-quote-other-bg-hover: hsl(var(--primary) / 0.12);
+  --fpl-timeline-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='240' viewBox='0 0 280 240'%3E%3Cg fill='none' stroke='%23ea580c' stroke-opacity='.11' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.35'%3E%3Ccircle cx='40' cy='62' r='5'/%3E%3Ccircle cx='111' cy='45' r='5'/%3E%3Ccircle cx='154' cy='104' r='5'/%3E%3Ccircle cx='230' cy='76' r='5'/%3E%3Ccircle cx='205' cy='178' r='5'/%3E%3Cpath d='M47 64C78 70 82 47 103 47' stroke-dasharray='4 7'/%3E%3Cpath d='M96 41l10 6-10 6'/%3E%3Cpath d='M118 49C135 65 128 90 148 100' stroke-dasharray='4 7'/%3E%3Cpath d='M141 95l10 6-4-11'/%3E%3Cpath d='M160 104C185 113 211 103 225 82'/%3E%3Cpath d='M215 83l11-3-4 11'/%3E%3Cpath d='M230 84C253 111 238 156 211 174' stroke-dasharray='4 7'/%3E%3Cpath d='M214 164l-5 11 11-4'/%3E%3Cpath d='M30 170c18-22 42-24 60-7s42 17 60-6' stroke-opacity='.07'/%3E%3Cpath d='M38 202h48M62 192v20M182 30h42M203 22v16' stroke-opacity='.07'/%3E%3C/g%3E%3C/svg%3E");
 }
 
 .fpl-ermis-chat .ermis-chat--dark {
@@ -237,11 +321,13 @@ html {
   --ermis-bubble-other-text: hsl(30 15% 94%);
   --ermis-quote-other-bg: hsl(var(--primary) / 0.1);
   --ermis-quote-other-bg-hover: hsl(var(--primary) / 0.16);
+  --fpl-timeline-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='240' viewBox='0 0 280 240'%3E%3Cg fill='none' stroke='%23fb923c' stroke-opacity='.17' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.35'%3E%3Ccircle cx='40' cy='62' r='5'/%3E%3Ccircle cx='111' cy='45' r='5'/%3E%3Ccircle cx='154' cy='104' r='5'/%3E%3Ccircle cx='230' cy='76' r='5'/%3E%3Ccircle cx='205' cy='178' r='5'/%3E%3Cpath d='M47 64C78 70 82 47 103 47' stroke-dasharray='4 7'/%3E%3Cpath d='M96 41l10 6-10 6'/%3E%3Cpath d='M118 49C135 65 128 90 148 100' stroke-dasharray='4 7'/%3E%3Cpath d='M141 95l10 6-4-11'/%3E%3Cpath d='M160 104C185 113 211 103 225 82'/%3E%3Cpath d='M215 83l11-3-4 11'/%3E%3Cpath d='M230 84C253 111 238 156 211 174' stroke-dasharray='4 7'/%3E%3Cpath d='M214 164l-5 11 11-4'/%3E%3Cpath d='M30 170c18-22 42-24 60-7s42 17 60-6' stroke-opacity='.1'/%3E%3Cpath d='M38 202h48M62 192v20M182 30h42M203 22v16' stroke-opacity='.1'/%3E%3C/g%3E%3C/svg%3E");
 }
 
 .fpl-ermis-chat .ermis-message-list {
   background-color: hsl(var(--fpl-timeline-bg));
   background-image:
+    var(--fpl-timeline-pattern),
     radial-gradient(
       circle at 8% 0%,
       hsl(var(--primary) / 0.09),
@@ -252,6 +338,9 @@ html {
       hsl(var(--primary) / 0.045),
       transparent 30%
     );
+  background-position: center, 8% 0%, 92% 100%;
+  background-repeat: repeat, no-repeat, no-repeat;
+  background-size: 280px 240px, auto, auto;
 }
 
 .fpl-ermis-chat .ermis-message-list__vlist {
@@ -661,6 +750,10 @@ html {
   padding: 0.75rem 1rem;
   overflow: visible;
   z-index: 20;
+  border-top-color: hsl(var(--fpl-timeline-border) / 0.9);
+  background: hsl(var(--background) / 0.82);
+  box-shadow: 0 -12px 28px -24px hsl(var(--fpl-timeline-shadow) / 0.8);
+  backdrop-filter: blur(16px);
 }
 
 .fpl-ermis-chat .ermis-message-input__row,
@@ -669,13 +762,35 @@ html {
   align-items: flex-end;
 }
 
+.fpl-ermis-chat .ermis-message-input__row {
+  gap: 0.375rem;
+  padding: 0.3125rem;
+  border: 1px solid hsl(var(--fpl-timeline-border) / 0.9);
+  border-radius: 1.25rem;
+  background: hsl(var(--fpl-timeline-surface) / 0.84);
+  box-shadow: 0 7px 20px -18px hsl(var(--fpl-timeline-shadow) / 0.85);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.fpl-ermis-chat .ermis-message-input:focus-within .ermis-message-input__row {
+  border-color: hsl(var(--primary) / 0.6);
+  box-shadow: 0 10px 26px -18px hsl(var(--primary) / 0.36);
+}
+
 .fpl-ermis-chat .ermis-message-input__editable {
   min-height: 2.5rem;
   max-height: 7rem;
+  padding: 0.625rem 0.5rem;
+  border-color: transparent;
+  background: transparent;
   overflow-x: hidden;
   overflow-y: auto;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.fpl-ermis-chat .ermis-message-input__editable:focus {
+  border-color: transparent;
 }
 
 .fpl-ermis-chat .ermis-message-input__editable::-webkit-scrollbar {

@@ -11,8 +11,10 @@ import { RoutePrefetcher } from "@/components/layout/route-prefetcher";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isChatRoute = pathname === "/chat" || pathname.startsWith("/chat/");
+  const isLoginRoute = pathname === "/login";
   const isPrimaryRoute =
     pathname === "/" || pathname === "/h2h" || isChatRoute;
+  const showMobileTabNav = isPrimaryRoute || isLoginRoute;
 
   useEffect(() => {
     if (!isChatRoute) return;
@@ -37,12 +39,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         className={cn(
           isChatRoute
             ? "flex min-h-0 flex-1 flex-col pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-0"
-            : isPrimaryRoute && "pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-0",
+            : showMobileTabNav && "pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-0",
         )}
       >
         {children}
       </div>
-      {isPrimaryRoute && <MobileTabNav />}
+      {showMobileTabNav && <MobileTabNav />}
     </div>
   );
 }

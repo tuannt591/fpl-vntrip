@@ -1,52 +1,62 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { RefreshCw, Search, Trophy } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Skeleton } from "./ui/skeleton";
 import { ManagerAccordionList } from './ui/manager-accordion-list';
 import { Button } from './ui/button';
+import {
+  FantasyLeaderboardContentSkeleton,
+  FantasyLeaderboardLoadingSkeleton,
+} from "@/components/fantasy-leaderboard-loading";
 import { LeaderboardEntry, TeamConfig, TeamStats, TeamWeeklyData } from '@/types/fantasy';
 import { VNTRIP_LEAGUE_ID, CURRENT_PHASE } from '@/lib/fpl-config';
+import { primaryPageContainerClassName } from "@/lib/page-layout";
+
+type FantasyLeaderboardResponse = {
+  entries: LeaderboardEntry[];
+  currentGW: number;
+  teamWeeklyData?: TeamWeeklyData | null;
+  error?: string;
+};
+
+type TeamFilter = "all" | "Vinno" | "Americano";
 
 const fetchFantasyVntripData = async (
   leagueId: string,
   phase: number = 1,
-  gw: number = 0
-): Promise<any> => {
-  try {
+  gw: number = 0,
+  signal?: AbortSignal,
+): Promise<FantasyLeaderboardResponse> => {
+  const params = new URLSearchParams({
+    leagueId,
+    phase: phase.toString(),
+  });
 
-    const params = new URLSearchParams({
-      leagueId: leagueId,
-      phase: phase.toString(),
-    });
-
-    if (gw > 0) {
-      params.append('gw', gw.toString());
-    }
-
-    const response = await fetch(`/api/fantasy-vntrip?${params}`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data: any = await response.json();
-
-    return data;
-  } catch (error) {
-    console.error('Error fetching all leaderboard data:', error);
-    return {
-      entries: [],
-      leagueName: "Failed to load league data",
-      currentGW: 0,
-    };
+  if (gw > 0) {
+    params.append('gw', gw.toString());
   }
+
+  const response = await fetch(`/api/fantasy-vntrip?${params}`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+    },
+    cache: 'no-store',
+    signal,
+  });
+  const data = (await response.json().catch(() => null)) as
+    | FantasyLeaderboardResponse
+    | null;
+
+  if (!response.ok || !data || !Array.isArray(data.entries)) {
+    throw new Error(
+      data?.error || `Không thể tải bảng xếp hạng (mã ${response.status}).`,
+    );
+  }
+
+  return data;
 };
 
 
@@ -88,24 +98,28 @@ const calculateTeamStats = (entries: LeaderboardEntry[]): TeamStats[] => {
   }).sort((a, b) => b.averagePoints - a.averagePoints);
 };
 
-const ManagersSkeleton = () => (
-  <>
-    {Array.from({ length: 9 }).map((_, index) => (
-      <div className='flex items-center gap-2 p-2' key={index}>
-        <Skeleton className="h-6 w-16 sm:w-20" />
-        <Skeleton className="h-6 flex-1" />
-        <Skeleton className="h-6 w-16 sm:w-20 md:w-24" />
-        <Skeleton className="h-6 w-10 sm:w-12" />
-        <div className="h-6 w-4" />
-      </div>
-    ))}
-  </>
-);
-
 // Team color mapping
-const TEAM_COLORS: Record<string, { text: string; bg: string; border: string }> = {
-  'Vinno': { text: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/30' },
-  'Americano': { text: 'text-violet-500', bg: 'bg-violet-500/10', border: 'border-violet-500/30' },
+const TEAM_COLORS: Record<string, {
+  text: string;
+  bg: string;
+  border: string;
+  bar: string;
+  surface: string;
+}> = {
+  Vinno: {
+    text: "text-red-500",
+    bg: "bg-red-500/10",
+    border: "border-red-500/30",
+    bar: "bg-red-500",
+    surface: "from-red-500/[0.12] via-transparent to-transparent",
+  },
+  Americano: {
+    text: "text-violet-500",
+    bg: "bg-violet-500/10",
+    border: "border-violet-500/30",
+    bar: "bg-violet-500",
+    surface: "from-violet-500/[0.12] via-transparent to-transparent",
+  },
 };
 
 // Get team key name for lookups
@@ -121,6 +135,10 @@ export const FantasyLeaderboard = () => {
   const [selectedGW, setSelectedGW] = useState<number>(0);
   const [teamWeeklyData, setTeamWeeklyData] = useState<TeamWeeklyData | null>(null);
   const [selectedTeamDialog, setSelectedTeamDialog] = useState<string | null>(null);
+  const [teamFilter, setTeamFilter] = useState<TeamFilter>("all");
+  const [managerQuery, setManagerQuery] = useState("");
+  const [hasLoadedData, setHasLoadedData] = useState(false);
+  const leaderboardRequestRef = useRef<AbortController | null>(null);
   const currentLeagueId = VNTRIP_LEAGUE_ID;
 
   const reloadData = () => {
@@ -129,28 +147,51 @@ export const FantasyLeaderboard = () => {
   };
 
   useEffect(() => {
+    leaderboardRequestRef.current?.abort();
+    const controller = new AbortController();
+    leaderboardRequestRef.current = controller;
+
     const loadAllData = async () => {
       setIsLoading(true);
       setError(null);
+      setSelectedTeamDialog(null);
 
       try {
-        const result = await fetchFantasyVntripData(currentLeagueId, CURRENT_PHASE, selectedGW);
+        const result = await fetchFantasyVntripData(
+          currentLeagueId,
+          CURRENT_PHASE,
+          selectedGW,
+          controller.signal,
+        );
+        if (controller.signal.aborted) return;
 
         setLeaderboardData(result.entries);
         setCurrentGW(result.currentGW);
         setTeamStats(calculateTeamStats(result.entries));
         setTeamWeeklyData(result.teamWeeklyData ?? null);
+        setHasLoadedData(true);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error loading data');
-        setLeaderboardData([]);
-        setCurrentGW(0);
-        setTeamStats([]);
+        if (controller.signal.aborted) return;
+
+        setError(
+          err instanceof Error ? err.message : 'Không thể tải bảng xếp hạng.',
+        );
       } finally {
-        setIsLoading(false);
+        if (leaderboardRequestRef.current === controller) {
+          leaderboardRequestRef.current = null;
+          setIsLoading(false);
+        }
       }
     };
 
-    loadAllData();
+    void loadAllData();
+
+    return () => {
+      if (leaderboardRequestRef.current === controller) {
+        leaderboardRequestRef.current = null;
+      }
+      controller.abort();
+    };
   }, [currentLeagueId, reloadKey, selectedGW]);
 
   // Get record for selected team in dialog
@@ -165,111 +206,235 @@ export const FantasyLeaderboard = () => {
       return { gw: week.gw, ...teamResult };
     }).filter(w => w.result)
     : [];
+  const filteredLeaderboardData = leaderboardData.filter((entry) => {
+    const matchesTeam = teamFilter === "all" || entry.team === teamFilter;
+    const query = managerQuery.trim().toLocaleLowerCase();
+    const matchesQuery =
+      !query ||
+      entry.manager.toLocaleLowerCase().includes(query) ||
+      entry.teamName.toLocaleLowerCase().includes(query);
+
+    return matchesTeam && matchesQuery;
+  });
+  const highestTeamPoints = Math.max(...teamStats.map((team) => team.totalPoints), 0);
+  const teamPointGap =
+    teamStats.length === 2
+      ? Math.abs(teamStats[0].totalPoints - teamStats[1].totalPoints)
+      : 0;
+
+  if (isLoading && !hasLoadedData) {
+    return <FantasyLeaderboardLoadingSkeleton />;
+  }
+
+  if (!hasLoadedData && error) {
+    return (
+      <div className={`${primaryPageContainerClassName} py-4`}>
+        <Card className="mx-auto max-w-xl rounded-3xl border-destructive/40">
+          <CardContent className="flex flex-col items-center gap-3 p-8 text-center">
+            <p className="text-sm text-destructive">{error}</p>
+            <Button type="button" variant="outline" onClick={reloadData}>
+              Thử lại
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto py-4 px-2">
+    <div className={`${primaryPageContainerClassName} py-4`}>
       <Card className='border-none shadow-none bg-transparent'>
         <CardHeader className='px-0 pt-0'>
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              Gameweek:&nbsp;
-              {isLoading ? (
-                <span>Loading...</span>
-              ) : (
-                <select
-                  value={selectedGW}
-                  onChange={e => {
-                    setSelectedGW(Number(e.target.value))
-                  }}
-                  className="border rounded px-1 py-0.5"
-                >
-                  {Array.from({ length: currentGW }, (_, i) => currentGW - i).map(gw => (
-                    <option key={gw} value={gw}>
-                      GW {gw}
-                    </option>
-                  ))}
-                </select>
-              )}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card/80 p-3 shadow-sm backdrop-blur sm:p-4">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Trophy className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  FPL Vntrip
+                </p>
+                <h1 className="text-lg font-black tracking-tight">Bảng xếp hạng</h1>
+              </div>
             </div>
 
-            <button
-              onClick={reloadData}
-              className="ml-2 px-2 py-1 rounded bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium flex items-center gap-1 disabled:opacity-60"
-              disabled={isLoading}
-              title="Reload data"
-              type="button"
-            >
-              <span className={isLoading ? 'animate-spin' : ''}>🔄</span>
-              Reload
-            </button>
+            <div className="flex items-center gap-2">
+              <label className="inline-flex h-9 items-center gap-1.5 rounded-xl border bg-background px-2.5 text-xs font-semibold shadow-sm">
+                <span className="text-muted-foreground">GW</span>
+                {isLoading ? (
+                  <span className="inline-block h-4 w-8 animate-pulse rounded bg-muted" />
+                ) : (
+                  <select
+                    aria-label="Chọn Gameweek"
+                    value={selectedGW || currentGW}
+                    onChange={(event) => setSelectedGW(Number(event.target.value))}
+                    className="min-w-11 bg-transparent font-mono text-sm font-bold outline-none"
+                  >
+                    {Array.from({ length: currentGW }, (_, index) => currentGW - index).map((gw) => (
+                      <option key={gw} value={gw}>
+                        {gw}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </label>
+              <button
+                onClick={reloadData}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border bg-background text-muted-foreground shadow-sm transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isLoading}
+                aria-label="Làm mới bảng xếp hạng"
+                title="Làm mới"
+                type="button"
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+              </button>
+            </div>
           </div>
         </CardHeader>
 
         <CardContent className="px-0">
-          <div>
-            {/* Team Stats Section */}
-            {!isLoading && teamStats.length > 0 && currentLeagueId === VNTRIP_LEAGUE_ID && (
-              <div className="mb-6">
-                <div className="grid grid-cols-2 gap-4 max-w-2xl mx-auto mb-6">
-                  {teamStats.map((team, index) => {
-                    const shortName = getTeamShortName(team.name);
-                    const record = teamWeeklyData?.teamRecords[shortName];
-                    const colors = TEAM_COLORS[shortName];
-                    return (
-                      <Card
-                        key={index}
-                        className={`bg-gray-100 dark:bg-gray-800 cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] active:scale-[0.98] ${record ? 'ring-1 ring-transparent hover:ring-gray-300 dark:hover:ring-gray-600' : ''}`}
-                        onClick={() => record && setSelectedTeamDialog(shortName)}
-                      >
-                        <CardHeader className='p-2'>
-                          <CardTitle className={`text-lg text-center ${team.color}`}>{team.name}</CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-0 pb-2">
-                          <p className="font-mono text-2xl font-extrabold text-center">{team.totalPoints.toLocaleString()}</p>
-                          <p className="text-xs text-center text-muted-foreground">
-                            Played: {team.totalPlayed}/{team.totalPlayedMax}
-                          </p>
-                          {/* W/L inline */}
-                          {record && (
-                            <div className="flex justify-center gap-2 mt-1.5 text-xs font-mono">
-                              <span className="text-green-600 font-bold">{record.wins}W</span>
-                              <span className="text-red-500 font-bold">{record.losses}L</span>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
+          {isLoading ? (
+            <FantasyLeaderboardContentSkeleton />
+          ) : (
+            <>
+              {error && (
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/25 bg-destructive/[0.05] p-3 text-sm text-destructive">
+                  <span>{error}</span>
+                  <Button type="button" size="sm" variant="outline" onClick={reloadData}>
+                    Thử lại
+                  </Button>
                 </div>
-              </div>
-            )}
-
-            <div className="relative">
-              {/* Sticky Header */}
-              <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 rounded-t-md bg-white shadow-sm dark:bg-gray-900 md:top-0">
-                <div className="flex gap-2 p-2 font-semibold text-xs sm:text-sm border-b">
-                  <div className="w-16 sm:w-20">Team</div>
-                  <div className='flex-1 min-w-0'>Manager</div>
-                  <div className="w-16 sm:w-20 md:w-24 text-center">(C)</div>
-                  <div className="w-10 sm:w-12 text-center">GW</div>
-                  <div className="w-4">&nbsp;</div>
-                </div>
-              </div>
-
-              {isLoading ? (
-                <ManagersSkeleton />
-              ) : error ? (
-                <div className="flex flex-col items-center justify-center space-y-2">
-                  <span className="text-red-500">⚠️ {error}</span>
-                  <span className="text-sm text-muted-foreground">Failed to load data from API</span>
-                </div>
-              ) : leaderboardData.length === 0 ? (
-                <div className="text-center py-4 text-muted-foreground">No data available</div>
-              ) : (
-                <ManagerAccordionList managers={leaderboardData} />
               )}
-            </div>
-          </div>
+
+              {teamStats.length > 0 && currentLeagueId === VNTRIP_LEAGUE_ID && (
+                <section className="mb-5 overflow-hidden rounded-3xl border bg-card shadow-[0_16px_34px_-30px_hsl(var(--foreground)/0.45)]">
+                  <div className="flex items-center justify-between border-b bg-muted/35 px-3 py-2 text-xs sm:px-4">
+                    <span className="font-semibold text-muted-foreground">Matchday scoreboard</span>
+                    <span className="rounded-full bg-background px-2 py-0.5 font-mono font-bold text-foreground shadow-sm">
+                      GW {selectedGW || currentGW}
+                    </span>
+                  </div>
+                  <div className="relative grid grid-cols-2 divide-x">
+                    {teamStats.map((team) => {
+                      const shortName = getTeamShortName(team.name);
+                      const record = teamWeeklyData?.teamRecords[shortName];
+                      const colors = TEAM_COLORS[shortName];
+                      const pointShare = highestTeamPoints
+                        ? Math.max((team.totalPoints / highestTeamPoints) * 100, 8)
+                        : 0;
+
+                      return (
+                        <button
+                          key={team.name}
+                          type="button"
+                          disabled={!record}
+                          onClick={() => setSelectedTeamDialog(shortName)}
+                          className={`group relative min-w-0 bg-gradient-to-br p-3 text-left transition sm:p-4 ${colors?.surface || "from-muted/60 to-transparent"} ${record ? "hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset" : "cursor-default"}`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className={`truncate text-sm font-black tracking-tight sm:text-base ${colors?.text || team.color}`}>
+                                {team.name}
+                              </p>
+                              <p className="mt-0.5 text-[10px] text-muted-foreground sm:text-xs">
+                                Đã chơi {team.totalPlayed}/{team.totalPlayedMax}
+                              </p>
+                            </div>
+                            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-black ${colors?.bg || "bg-muted"} ${colors?.text || "text-foreground"}`}>
+                              {team.name.charAt(0)}
+                            </span>
+                          </div>
+                          <p className="mt-4 font-mono text-3xl font-black tracking-tight sm:text-4xl text-center">
+                            {team.totalPoints.toLocaleString()}
+                          </p>
+                          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted/80">
+                            <span
+                              className={`block h-full rounded-full transition-[width] duration-500 ${colors?.bar || "bg-primary"}`}
+                              style={{ width: `${pointShare}%` }}
+                            />
+                          </div>
+                          <div className="mt-3 flex items-center justify-between gap-1 text-[10px] font-semibold sm:text-xs">
+                            {record ? (
+                              <span className="font-mono">
+                                <span className="text-emerald-600 dark:text-emerald-400">{record.wins}W</span>
+                                <span className="mx-1 text-muted-foreground">·</span>
+                                <span className="text-destructive">{record.losses}L</span>
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">Chưa có đối đầu</span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                    {teamStats.length === 2 && (
+                      <span className="pointer-events-none absolute left-1/2 top-1/2 z-10 flex h-9 min-w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border bg-background px-1.5 font-mono text-xs font-black shadow-sm">
+                        {teamPointGap ? `+${teamPointGap}` : "="}
+                      </span>
+                    )}
+                  </div>
+                </section>
+              )}
+
+              <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                <div className="flex flex-col gap-2 border-b bg-muted/25 p-2 sm:flex-row sm:items-center sm:justify-between sm:px-3">
+                  <div
+                    role="tablist"
+                    aria-label="Lọc theo đội"
+                    className="grid grid-cols-3 rounded-xl bg-muted p-1 text-xs font-semibold"
+                  >
+                    {([
+                      ["all", "Tất cả"],
+                      ["Vinno", "Vinno"],
+                      ["Americano", "Americano"],
+                    ] as const).map(([filter, label]) => (
+                      <button
+                        key={filter}
+                        type="button"
+                        role="tab"
+                        aria-selected={teamFilter === filter}
+                        onClick={() => setTeamFilter(filter)}
+                        className={`h-8 rounded-lg px-3 transition ${teamFilter === filter ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <label className="relative hidden w-full max-w-xs md:block">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="search"
+                      value={managerQuery}
+                      onChange={(event) => setManagerQuery(event.target.value)}
+                      placeholder="Tìm manager hoặc đội..."
+                      className="h-8 w-full rounded-xl border bg-background pl-8 pr-3 text-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/15"
+                    />
+                  </label>
+                </div>
+
+                <div className="relative">
+                  <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 border-b bg-background/90 shadow-sm backdrop-blur md:top-0">
+                    <div className="flex items-center gap-2 px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:px-3 sm:text-xs">
+                      <div className="w-8 text-center">#</div>
+                      <div className="w-16 sm:w-20">Team</div>
+                      <div className="min-w-0 flex-1">Manager</div>
+                      <div className="w-16 text-center sm:w-20 md:w-24">(C)</div>
+                      <div className="w-10 text-center sm:w-12">GW</div>
+                      <div className="w-4" />
+                    </div>
+                  </div>
+
+                  {filteredLeaderboardData.length === 0 ? (
+                    <div className="py-10 text-center text-sm text-muted-foreground">
+                      Không tìm thấy manager phù hợp.
+                    </div>
+                  ) : (
+                    <ManagerAccordionList managers={filteredLeaderboardData} />
+                  )}
+                </div>
+              </section>
+            </>
+          )}
         </CardContent>
       </Card>
 

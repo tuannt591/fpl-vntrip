@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -15,6 +15,7 @@ import {
   H2HDashboard,
   type H2HDashboardData,
 } from "@/components/h2h/h2h-dashboard";
+import { H2HLoadingSkeleton } from "@/components/h2h/h2h-loading-skeleton";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -45,43 +46,6 @@ type ManagerOptionsResponse = {
 
 type ViewState = "loading" | "anonymous" | "ready" | "error";
 
-const MANAGER_CLAIM_STORAGE_KEY = "fpl-vntrip:h2h-manager-claim";
-
-function getCachedManagerClaim(
-  profileId: string,
-  season: string,
-  leagueId: string,
-): ClaimedManager | null {
-  try {
-    const value = window.sessionStorage.getItem(MANAGER_CLAIM_STORAGE_KEY);
-    if (!value) return null;
-
-    const manager = JSON.parse(value) as Partial<ClaimedManager>;
-    if (
-      manager.profileId !== profileId ||
-      manager.season !== season ||
-      manager.leagueId !== leagueId ||
-      typeof manager.id !== "string" ||
-      typeof manager.entryId !== "number" ||
-      typeof manager.managerName !== "string" ||
-      typeof manager.teamName !== "string"
-    ) {
-      return null;
-    }
-
-    return manager as ClaimedManager;
-  } catch {
-    return null;
-  }
-}
-
-function cacheManagerClaim(manager: ClaimedManager) {
-  window.sessionStorage.setItem(
-    MANAGER_CLAIM_STORAGE_KEY,
-    JSON.stringify(manager),
-  );
-}
-
 function ManagerAvatar({ manager }: { manager: H2HManagerOption }) {
   if (manager.managerAvatar) {
     return (
@@ -111,21 +75,25 @@ export function H2HPanel() {
   const [claimDialogOpen, setClaimDialogOpen] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const managerRequestRef = useRef<AbortController | null>(null);
 
-  const loadManagerOptions = useCallback(async (forceRefresh = false) => {
+  const loadManagerOptions = useCallback(async () => {
+    managerRequestRef.current?.abort();
+    const controller = new AbortController();
+    managerRequestRef.current = controller;
     setViewState("loading");
     setErrorMessage("");
 
     try {
-      const response = await fetch(
-        forceRefresh ? `/api/h2h/managers?refresh=${Date.now()}` : "/api/h2h/managers",
-        {
+      const response = await fetch("/api/h2h/managers", {
         headers: {
           Accept: "application/json",
         },
-        cache: forceRefresh ? "no-store" : "default",
-      },
-      );
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) return;
+
       if (response.status === 401) {
         setViewState("anonymous");
         return;
@@ -134,6 +102,8 @@ export function H2HPanel() {
       const responseData = (await response.json()) as
         | ManagerOptionsResponse
         | { error?: string };
+      if (controller.signal.aborted) return;
+
       if (!response.ok || !("managers" in responseData)) {
         throw new Error(
           "error" in responseData && responseData.error
@@ -142,14 +112,7 @@ export function H2HPanel() {
         );
       }
 
-      const cachedManager = getCachedManagerClaim(
-        responseData.profile.id,
-        responseData.season,
-        responseData.leagueId,
-      );
-      const myManager = responseData.myManager || cachedManager;
-
-      if (responseData.myManager) cacheManagerClaim(responseData.myManager);
+      const myManager = responseData.myManager;
 
       setData({
         ...responseData,
@@ -165,15 +128,26 @@ export function H2HPanel() {
       });
       setViewState("ready");
     } catch (error) {
+      if (controller.signal.aborted) return;
+
       setErrorMessage(
         error instanceof Error ? error.message : "Không thể tải dữ liệu H2H.",
       );
       setViewState("error");
+    } finally {
+      if (managerRequestRef.current === controller) {
+        managerRequestRef.current = null;
+      }
     }
   }, []);
 
   useEffect(() => {
     void loadManagerOptions();
+    return () => {
+      const controller = managerRequestRef.current;
+      managerRequestRef.current = null;
+      controller?.abort();
+    };
   }, [loadManagerOptions]);
 
   useEffect(() => {
@@ -199,6 +173,11 @@ export function H2HPanel() {
         },
         body: JSON.stringify({ entryId: selectedManager.entryId }),
       });
+      if (response.status === 401) {
+        setViewState("anonymous");
+        return;
+      }
+
       const responseData = (await response.json()) as {
         manager?: ClaimedManager;
         error?: string;
@@ -206,8 +185,6 @@ export function H2HPanel() {
       if (!response.ok || !responseData.manager) {
         throw new Error(responseData.error || "Không thể claim manager.");
       }
-
-      cacheManagerClaim(responseData.manager);
 
       setData((current) =>
         current
@@ -241,23 +218,8 @@ export function H2HPanel() {
     }
   };
 
-  if (viewState === "loading") {
-    return (
-      <div className="flex min-h-[420px] items-center justify-center">
-        <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground">
-          <Loader2 className="h-7 w-7 animate-spin text-primary" />
-          Đang mở H2H Arena...
-        </div>
-      </div>
-    );
-  }
-
-  if (viewState === "anonymous") {
-    return (
-      <div className="flex min-h-[420px] items-center justify-center">
-        <Loader2 className="h-7 w-7 animate-spin text-primary" />
-      </div>
-    );
+  if (viewState === "loading" || viewState === "anonymous") {
+    return <H2HLoadingSkeleton />;
   }
 
   if (viewState === "error" || !data) {
@@ -268,7 +230,7 @@ export function H2HPanel() {
           <p className="text-sm text-destructive">
             {errorMessage || "Không thể tải dữ liệu H2H."}
           </p>
-          <Button variant="outline" onClick={() => void loadManagerOptions(true)}>
+          <Button variant="outline" onClick={() => void loadManagerOptions()}>
             Thử lại
           </Button>
         </CardContent>
@@ -281,7 +243,7 @@ export function H2HPanel() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
+    <div className="w-full space-y-5">
       <div className="rounded-3xl border bg-gradient-to-br from-primary/[0.09] to-transparent p-6 sm:p-8">
         <div className="flex items-start gap-4">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground">

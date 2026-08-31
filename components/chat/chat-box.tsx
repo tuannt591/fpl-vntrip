@@ -115,8 +115,8 @@ function ChatChannel({
 
   return (
     <Channel>
-      <header className="flex min-h-[64px] shrink-0 items-center gap-2 border-b bg-background px-2.5 sm:min-h-[76px] sm:gap-3 sm:px-5">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-primary sm:h-10 sm:w-10">
+      <header className="relative z-20 flex min-h-[64px] shrink-0 items-center gap-2 border-b border-border/70 bg-background/80 px-2.5 shadow-[0_10px_24px_-24px_hsl(var(--foreground)/0.6)] backdrop-blur-xl sm:min-h-[76px] sm:gap-3 sm:px-5">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-primary ring-2 ring-primary/10 shadow-sm sm:h-10 sm:w-10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/vntrip-ava.png"
@@ -125,10 +125,10 @@ function ChatChannel({
           />
         </div>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-sm font-semibold sm:text-base">
+          <h1 className="truncate text-sm font-bold tracking-tight sm:text-base">
             {channelName}
           </h1>
-          <p className="truncate text-xs text-muted-foreground">
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">
             {memberCount} thành viên
           </p>
         </div>
@@ -191,7 +191,7 @@ export function ChatBox({
   const client = channel.getClient();
 
   return (
-    <section className="fpl-ermis-chat relative mx-auto min-h-0 w-full flex-1 overflow-hidden bg-card sm:max-w-5xl sm:rounded-3xl sm:border sm:shadow-[0_24px_70px_-35px_rgba(15,23,42,0.35)] sm:dark:shadow-[0_24px_70px_-35px_rgba(0,0,0,0.8)]">
+    <section className="fpl-ermis-chat relative mx-auto min-h-0 w-full max-w-5xl flex-1 overflow-hidden bg-card sm:rounded-3xl sm:border sm:shadow-[0_24px_70px_-35px_rgba(15,23,42,0.35)] sm:dark:shadow-[0_24px_70px_-35px_rgba(0,0,0,0.8)]">
       <ChatProvider client={client} initialTheme="light">
         <ChatChannel channel={channel} />
       </ChatProvider>

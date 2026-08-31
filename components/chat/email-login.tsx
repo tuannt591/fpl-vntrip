@@ -20,7 +20,6 @@ import {
 import type { ErmisAuthProvider } from "@ermis-network/ermis-chat-sdk";
 
 import { Button } from "@/components/ui/button";
-import { ChatBackButton } from "@/components/chat/chat-back-button";
 import { ermisConfig } from "@/config/ermis";
 import { cn } from "@/lib/utils";
 import type { AuthSession } from "./types";
@@ -251,7 +250,6 @@ export function EmailLogin({
       <div className="relative grid min-h-[100dvh] grid-rows-[auto_1fr] sm:h-full sm:min-h-0 md:grid-cols-[minmax(17rem,0.85fr)_minmax(0,1.15fr)] md:grid-rows-1">
         <div className="border-b bg-primary/[0.06] p-5 sm:p-6 md:flex md:flex-col md:border-b-0 md:border-r md:p-8 lg:p-10">
           <div className="flex items-center gap-2.5">
-            <ChatBackButton className="-ml-2" />
             <div>
               <p className="hidden text-xs font-semibold uppercase tracking-[0.16em] text-primary md:block">
                 FPL Vntrip

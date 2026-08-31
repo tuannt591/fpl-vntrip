@@ -15,7 +15,7 @@ import type {
 } from "@ermis-network/ermis-chat-sdk";
 
 import { ChatBox } from "@/components/chat/chat-box";
-import { AuthLoading } from "@/components/chat/auth-loading";
+import { ChatLoading } from "@/components/chat/chat-loading";
 import type { AuthSession } from "@/components/chat/types";
 import { Button } from "@/components/ui/button";
 import { ermisConfig } from "@/config/ermis";
@@ -30,6 +30,12 @@ type CachedChannel = {
 };
 
 let cachedChannel: CachedChannel | null = null;
+
+function getCachedChannel(userId: string | undefined, token: string) {
+  return userId && cachedChannel?.userId === userId && cachedChannel.token === token
+    ? cachedChannel.channel
+    : null;
+}
 
 function getUserIdFromToken(token: string) {
   try {
@@ -72,15 +78,10 @@ export function ChannelGate({
   onLogout,
 }: {
   session: AuthSession;
-  onLogout: () => void;
+  onLogout: () => Promise<void>;
 }) {
   const userId = session.userId || getUserIdFromToken(session.token);
-  const initialChannel =
-    userId &&
-    cachedChannel?.userId === userId &&
-    cachedChannel.token === session.token
-      ? cachedChannel.channel
-      : null;
+  const initialChannel = getCachedChannel(userId, session.token);
   const [status, setStatus] = useState<ChannelStatus>(() =>
     initialChannel && userId && initialChannel.state.members[userId]
       ? "chat"
@@ -91,35 +92,57 @@ export function ChannelGate({
   const [channel, setChannel] = useState<Channel | null>(initialChannel);
   const [errorMessage, setErrorMessage] = useState("");
   const clientRef = useRef<ErmisChat | null>(null);
+  const connectionRequestRef = useRef(0);
+  const [connectionAttempt, setConnectionAttempt] = useState(0);
 
   useEffect(() => {
+    const requestId = connectionRequestRef.current + 1;
+    connectionRequestRef.current = requestId;
     let cancelled = false;
+    const isCurrentRequest = () =>
+      !cancelled && connectionRequestRef.current === requestId;
 
     const initializeChannel = async () => {
-      setStatus("loading");
-      setErrorMessage("");
-
       try {
+        const existingChannel = getCachedChannel(userId, session.token);
+        if (existingChannel && userId) {
+          clientRef.current = existingChannel.getClient();
+          setChannel(existingChannel);
+          setStatus(
+            existingChannel.state.members[userId] ? "chat" : "join",
+          );
+          setErrorMessage("");
+          return;
+        }
+
+        setChannel(null);
+        setStatus("loading");
+        setErrorMessage("");
+
         if (!userId) {
           throw new Error(
             "Phiên đăng nhập không có user ID. Vui lòng đăng xuất và đăng nhập lại.",
           );
         }
 
-        if (
-          cachedChannel &&
-          cachedChannel.userId === userId &&
-          cachedChannel.token === session.token
-        ) {
-          clientRef.current = cachedChannel.channel.getClient();
-          setChannel(cachedChannel.channel);
-          setStatus(
-            cachedChannel.channel.state.members[userId] ? "chat" : "join",
-          );
-          return;
-        }
+        const disconnectCancelledConnection = async (client: ErmisChat) => {
+          if (
+            connectionRequestRef.current !== requestId ||
+            client.userID !== userId
+          ) {
+            return;
+          }
+
+          try {
+            await client.disconnectUser();
+          } catch {
+            // A cancelled connection may already have been closed by the SDK.
+          }
+        };
 
         const { ErmisChat } = await import("@ermis-network/ermis-chat-sdk");
+        if (!isCurrentRequest()) return;
+
         const client = ErmisChat.getInstance(
           ermisConfig.apiKey,
           ermisConfig.projectId,
@@ -131,6 +154,7 @@ export function ChannelGate({
 
         if (client.userID && client.userID !== userId) {
           await client.disconnectUser();
+          if (!isCurrentRequest()) return;
         }
 
         await client.connectUser(
@@ -142,6 +166,10 @@ export function ChannelGate({
           session.token,
           { refreshToken: session.refreshToken },
         );
+        if (!isCurrentRequest()) {
+          await disconnectCancelledConnection(client);
+          return;
+        }
 
         const queriedChannel = client.channel(
           ermisConfig.channelType,
@@ -149,13 +177,16 @@ export function ChannelGate({
         );
         await queriedChannel.watch();
 
-        if (cancelled) return;
+        if (!isCurrentRequest()) {
+          await disconnectCancelledConnection(client);
+          return;
+        }
 
         cachedChannel = { channel: queriedChannel, token: session.token, userId };
         setChannel(queriedChannel);
         setStatus(queriedChannel.state.members[userId] ? "chat" : "join");
       } catch (error) {
-        if (cancelled) return;
+        if (!isCurrentRequest()) return;
 
         setErrorMessage(getErrorMessage(error));
         setStatus("error");
@@ -167,7 +198,7 @@ export function ChannelGate({
     return () => {
       cancelled = true;
     };
-  }, [session.email, session.refreshToken, session.token, userId]);
+  }, [connectionAttempt, session.email, session.refreshToken, session.token, userId]);
 
   const handleJoin = async () => {
     if (!channel || !userId || status === "joining") return;
@@ -189,9 +220,11 @@ export function ChannelGate({
   const handleLogout = async () => {
     try {
       await clientRef.current?.disconnectUser();
+    } catch {
+      // The app session is cleared even when the chat connection is already gone.
     } finally {
       cachedChannel = null;
-      onLogout();
+      await onLogout();
     }
   };
 
@@ -202,18 +235,12 @@ export function ChannelGate({
   }
 
   if (status === "loading") {
-    return (
-      <AuthLoading
-        fullHeight
-        message="Đang tải thông tin kênh..."
-        showBackButton={false}
-      />
-    );
+    return <ChatLoading />;
   }
 
   if (status === "error") {
     return (
-      <section className="relative mx-auto flex min-h-0 flex-1 max-w-5xl flex-col items-center justify-center bg-card px-5 text-center sm:rounded-3xl sm:border sm:shadow-[0_20px_60px_-38px_rgba(15,23,42,0.35)]">
+      <section className="relative mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col items-center justify-center bg-card px-5 text-center sm:rounded-3xl sm:border sm:shadow-[0_20px_60px_-38px_rgba(15,23,42,0.35)]">
         <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
           <AlertCircle className="h-6 w-6" />
         </div>
@@ -221,15 +248,25 @@ export function ChannelGate({
         <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
           {errorMessage}
         </p>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => void handleLogout()}
-          className="mt-5 gap-2 rounded-xl"
-        >
-          <LogOut className="h-4 w-4" />
-          Đăng xuất
-        </Button>
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setConnectionAttempt((current) => current + 1)}
+            className="gap-2 rounded-xl"
+          >
+            Thử lại
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void handleLogout()}
+            className="gap-2 rounded-xl"
+          >
+            <LogOut className="h-4 w-4" />
+            Đăng xuất
+          </Button>
+        </div>
       </section>
     );
   }
@@ -249,7 +286,7 @@ export function ChannelGate({
         : 0;
 
   return (
-    <section className="relative mx-auto flex min-h-0 flex-1 max-w-5xl items-center justify-center overflow-hidden bg-card px-5 py-20 sm:rounded-3xl sm:border sm:py-10 sm:shadow-[0_20px_60px_-38px_rgba(15,23,42,0.35)]">
+    <section className="relative mx-auto flex min-h-0 w-full max-w-5xl flex-1 items-center justify-center overflow-hidden bg-card px-5 py-20 sm:rounded-3xl sm:border sm:py-10 sm:shadow-[0_20px_60px_-38px_rgba(15,23,42,0.35)]">
       <div className="pointer-events-none absolute -right-20 -top-28 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
       <div className="relative w-full max-w-md text-center">
         <div className="mx-auto flex h-20 w-20 items-center justify-center overflow-hidden rounded-3xl bg-primary/10 text-primary ring-4 ring-background shadow-md">

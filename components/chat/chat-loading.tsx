@@ -1,6 +1,6 @@
-import { Hash, MoreHorizontal, Paperclip, Send } from "lucide-react";
+import { Paperclip, Send } from "lucide-react";
 
-import { ChatBackButton } from "@/components/chat/chat-back-button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const messageSkeletons = [
   { side: "left", width: "w-52 sm:w-72" },
@@ -13,24 +13,19 @@ export function ChatLoading() {
     <section
       role="status"
       aria-label="Đang đồng bộ cuộc trò chuyện"
-      className="relative mx-auto flex h-[100dvh] w-full flex-col overflow-hidden bg-card sm:h-[calc(100dvh-2.25rem)] sm:min-h-0 sm:max-w-5xl sm:rounded-3xl sm:border sm:shadow-[0_24px_70px_-35px_rgba(15,23,42,0.35)] sm:dark:shadow-[0_24px_70px_-35px_rgba(0,0,0,0.8)]"
+      className="relative mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col overflow-hidden bg-card sm:rounded-3xl sm:border sm:shadow-[0_24px_70px_-35px_rgba(15,23,42,0.35)] sm:dark:shadow-[0_24px_70px_-35px_rgba(0,0,0,0.8)]"
     >
       <div className="absolute inset-x-0 top-0 h-0.5 overflow-hidden bg-primary/10">
         <div className="h-full w-1/2 animate-pulse rounded-full bg-primary" />
       </div>
 
       <header className="flex h-[64px] shrink-0 items-center gap-2 border-b px-2.5 sm:h-[76px] sm:gap-3 sm:px-5">
-        <ChatBackButton />
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary sm:h-10 sm:w-10">
-          <Hash className="h-5 w-5" />
-        </div>
+        <Skeleton className="h-9 w-9 shrink-0 rounded-full sm:h-10 sm:w-10" />
         <div className="min-w-0 flex-1 space-y-2">
-          <div className="h-3.5 w-36 animate-pulse rounded-full bg-muted" />
-          <div className="h-2.5 w-24 animate-pulse rounded-full bg-muted/70" />
+          <Skeleton className="h-3.5 w-36 rounded-full" />
+          <Skeleton className="h-2.5 w-24 rounded-full" />
         </div>
-        <div className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground/50">
-          <MoreHorizontal className="h-5 w-5" />
-        </div>
+        <Skeleton className="h-9 w-9 rounded-full" />
       </header>
 
       <div className="flex flex-1 flex-col overflow-hidden bg-muted/15 px-4 py-6 sm:px-6">
@@ -50,18 +45,16 @@ export function ChatLoading() {
                 message.side === "right" ? "justify-end" : "justify-start"
               }`}
             >
-              {message.side === "left" && (
-                <div className="h-8 w-8 shrink-0 animate-pulse rounded-full bg-muted" />
-              )}
+              {message.side === "left" && <Skeleton className="h-8 w-8 shrink-0 rounded-full" />}
               <div
-                className={`${message.width} animate-pulse space-y-2 rounded-2xl px-4 py-3 ${
+                className={`${message.width} space-y-2 rounded-2xl px-4 py-3 ${
                   message.side === "right"
                     ? "rounded-br-md bg-primary/15"
                     : "rounded-bl-md bg-muted"
                 }`}
               >
-                <div className="h-2.5 w-full rounded-full bg-foreground/10" />
-                <div className="h-2.5 w-3/4 rounded-full bg-foreground/10" />
+                <Skeleton className="h-2.5 w-full rounded-full bg-foreground/10" />
+                <Skeleton className="h-2.5 w-3/4 rounded-full bg-foreground/10" />
               </div>
             </div>
           ))}
@@ -72,7 +65,7 @@ export function ChatLoading() {
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground/40">
           <Paperclip className="h-5 w-5" />
         </div>
-        <div className="h-11 flex-1 animate-pulse rounded-2xl bg-muted/80" />
+        <Skeleton className="h-11 flex-1 rounded-2xl" />
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary/50">
           <Send className="h-4 w-4" />
         </div>

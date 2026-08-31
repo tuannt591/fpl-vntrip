@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   Check,
@@ -32,6 +33,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  H2HLoadingSkeleton,
+  H2HMatchesSkeleton,
+} from "@/components/h2h/h2h-loading-skeleton";
 import { cn } from "@/lib/utils";
 import type {
   AppProfile,
@@ -303,6 +308,7 @@ function calculateMyRecord(matches: H2HGroupMatch[], myEntryId: number): MyRecor
 }
 
 export function H2HDashboard({ data }: { data: H2HDashboardData }) {
+  const router = useRouter();
   const [matchesData, setMatchesData] = useState<MatchesResponse | null>(null);
   const [selectedEntryIds, setSelectedEntryIds] = useState<number[]>([]);
   const [matchFilter, setMatchFilter] = useState<"mine" | "all">("mine");
@@ -314,17 +320,38 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
   const [deleteMatch, setDeleteMatch] = useState<H2HGroupMatch | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const matchesRequestRef = useRef<AbortController | null>(null);
+
+  const redirectToLogin = useCallback(() => {
+    setIsRedirecting(true);
+    router.replace("/login?next=%2Fh2h");
+  }, [router]);
 
   const loadMatches = useCallback(async () => {
+    matchesRequestRef.current?.abort();
+    const controller = new AbortController();
+    matchesRequestRef.current = controller;
     setIsLoading(true);
     setErrorMessage("");
     try {
       const response = await fetch("/api/h2h/matches", {
         headers: { Accept: "application/json" },
+        cache: "no-store",
+        signal: controller.signal,
       });
+      if (controller.signal.aborted) return;
+
+      if (response.status === 401) {
+        redirectToLogin();
+        return;
+      }
+
       const responseData = (await response.json()) as
         | MatchesResponse
         | { error?: string };
+      if (controller.signal.aborted) return;
+
       if (!response.ok || !("matches" in responseData)) {
         throw new Error(
           "error" in responseData && responseData.error
@@ -334,16 +361,26 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
       }
       setMatchesData(responseData);
     } catch (error) {
+      if (controller.signal.aborted) return;
+
       setErrorMessage(
         error instanceof Error ? error.message : "Không thể tải các trận H2H.",
       );
     } finally {
-      setIsLoading(false);
+      if (matchesRequestRef.current === controller) {
+        matchesRequestRef.current = null;
+        setIsLoading(false);
+      }
     }
-  }, []);
+  }, [redirectToLogin]);
 
   useEffect(() => {
     void loadMatches();
+    return () => {
+      const controller = matchesRequestRef.current;
+      matchesRequestRef.current = null;
+      controller?.abort();
+    };
   }, [loadMatches]);
 
   useEffect(() => {
@@ -408,6 +445,11 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
         },
         body: JSON.stringify({ opponentEntryIds: selectedEntryIds }),
       });
+      if (response.status === 401) {
+        redirectToLogin();
+        return;
+      }
+
       const responseData = (await response.json()) as {
         match?: H2HGroupMatch;
         error?: string;
@@ -440,6 +482,11 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
         method: "DELETE",
         headers: { Accept: "application/json" },
       });
+      if (response.status === 401) {
+        redirectToLogin();
+        return;
+      }
+
       const responseData = (await response.json()) as {
         success?: boolean;
         error?: string;
@@ -458,8 +505,26 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
     }
   };
 
+  if (isRedirecting || (isLoading && !matchesData)) {
+    return <H2HLoadingSkeleton />;
+  }
+
+  if (!matchesData && errorMessage) {
+    return (
+      <Card className="mx-auto max-w-xl rounded-3xl border-destructive/40">
+        <CardContent className="flex flex-col items-center gap-3 p-8 text-center">
+          <AlertCircle className="h-8 w-8 text-destructive" />
+          <p className="text-sm text-destructive">{errorMessage}</p>
+          <Button variant="outline" onClick={() => void loadMatches()}>
+            Thử lại
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
+    <div className="w-full space-y-5">
       <section className="rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
         <div className="flex items-center gap-3">
           <Avatar manager={data.myManager} />
@@ -583,9 +648,7 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
         </div>
 
         {isLoading ? (
-          <div className="flex min-h-40 items-center justify-center gap-2 rounded-2xl border bg-card text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" /> Đang tải...
-          </div>
+          <H2HMatchesSkeleton />
         ) : displayedMatches.length ? (
           <div className="space-y-3">
             {displayedMatches.map((match) => (

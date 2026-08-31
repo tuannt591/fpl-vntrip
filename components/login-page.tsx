@@ -81,7 +81,12 @@ export function LoginPage() {
   };
 
   if (!isSessionReady || isRestoringSession) {
-    return <AuthLoading message="Đang kiểm tra phiên đăng nhập..." />;
+    return (
+      <AuthLoading
+        message="Đang kiểm tra phiên đăng nhập..."
+        showBackButton={false}
+      />
+    );
   }
 
   return <EmailLogin onAuthenticated={handleAuthenticated} />;

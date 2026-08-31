@@ -23,9 +23,8 @@ export function MobileTabNav() {
   const prefetchedRoutes = useRef(new Set<string>());
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const selectedHref = pendingHref ?? pathname;
-  const selectedIndex = Math.max(
-    0,
-    navigationItems.findIndex(({ href }) => isActivePath(selectedHref, href)),
+  const selectedIndex = navigationItems.findIndex(({ href }) =>
+    isActivePath(selectedHref, href),
   );
 
   useEffect(() => setPendingHref(null), [pathname]);
@@ -47,11 +46,13 @@ export function MobileTabNav() {
     >
       <div className="mx-auto max-w-[17.5rem] rounded-[1.7rem] border border-border/50 bg-background/50 p-1 shadow-[0_10px_28px_hsl(var(--foreground)/0.14)] backdrop-blur-2xl dark:border-border/70">
         <div className="relative grid h-10 grid-cols-3">
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 left-0 w-1/3 rounded-[1.35rem] bg-primary shadow-[0_4px_12px_hsl(var(--primary)/0.28)] transition-transform duration-300 ease-out motion-reduce:transition-none"
-            style={{ transform: `translateX(${selectedIndex * 100}%)` }}
-          />
+          {selectedIndex >= 0 && (
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-0 left-0 w-1/3 rounded-[1.35rem] bg-primary shadow-[0_4px_12px_hsl(var(--primary)/0.28)] transition-transform duration-300 ease-out motion-reduce:transition-none"
+              style={{ transform: `translateX(${selectedIndex * 100}%)` }}
+            />
+          )}
           {navigationItems.map(({ href, label, icon: Icon }) => {
             const active = isActivePath(pathname, href);
             const pending = pendingHref === href;
