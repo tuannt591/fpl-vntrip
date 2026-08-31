@@ -38,7 +38,8 @@ export async function GET(request: NextRequest) {
       managers: options,
     }, {
       headers: {
-        'Cache-Control': 'no-store, max-age=0',
+        'Cache-Control': 'private, max-age=15, stale-while-revalidate=45',
+        'Vary': 'Cookie',
       },
     });
   } catch (error) {

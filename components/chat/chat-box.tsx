@@ -16,7 +16,6 @@ import {
 } from "@ermis-network/ermis-chat-react";
 
 import { Button } from "@/components/ui/button";
-import { ChatBackButton } from "@/components/chat/chat-back-button";
 import {
   ChatMediaPicker,
   ChatMediaToggleButton,
@@ -117,7 +116,6 @@ function ChatChannel({
   return (
     <Channel>
       <header className="flex min-h-[64px] shrink-0 items-center gap-2 border-b bg-background px-2.5 sm:min-h-[76px] sm:gap-3 sm:px-5">
-        <ChatBackButton />
         <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-primary sm:h-10 sm:w-10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -193,7 +191,7 @@ export function ChatBox({
   const client = channel.getClient();
 
   return (
-    <section className="fpl-ermis-chat relative mx-auto h-[100dvh] w-full overflow-hidden bg-card sm:h-[calc(100dvh-2.25rem)] sm:min-h-0 sm:max-w-5xl sm:rounded-3xl sm:border sm:shadow-[0_24px_70px_-35px_rgba(15,23,42,0.35)] sm:dark:shadow-[0_24px_70px_-35px_rgba(0,0,0,0.8)]">
+    <section className="fpl-ermis-chat relative mx-auto min-h-0 w-full flex-1 overflow-hidden bg-card sm:max-w-5xl sm:rounded-3xl sm:border sm:shadow-[0_24px_70px_-35px_rgba(15,23,42,0.35)] sm:dark:shadow-[0_24px_70px_-35px_rgba(0,0,0,0.8)]">
       <ChatProvider client={client} initialTheme="light">
         <ChatChannel channel={channel} />
       </ChatProvider>

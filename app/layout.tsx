@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import "@ermis-network/ermis-chat-react/dist/index.css";
 import "./globals.css";
+import { AuthSessionProvider } from "@/components/auth/auth-session-provider";
 import { cn } from "@/lib/utils";
-import { Navbar } from "@/components/layout/navbar";
+import { AppShell } from "@/components/layout/app-shell";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { JsonLd } from "@/components/json-ld";
 
@@ -62,7 +62,7 @@ export default function RootLayout({
   return (
     <html lang="vi" suppressHydrationWarning>
       <body
-        className={cn("min-h-screen bg-background", inter.className)}
+        className={cn("bg-background", inter.className)}
         suppressHydrationWarning
       >
         <ThemeProvider
@@ -71,9 +71,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <JsonLd />
-          <Navbar />
-          {children}
+          <AuthSessionProvider>
+            <JsonLd />
+            <AppShell>{children}</AppShell>
+          </AuthSessionProvider>
         </ThemeProvider>
       </body>
     </html>

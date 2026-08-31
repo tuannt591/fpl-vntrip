@@ -112,18 +112,20 @@ export function H2HPanel() {
   const [isClaiming, setIsClaiming] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const loadManagerOptions = useCallback(async () => {
+  const loadManagerOptions = useCallback(async (forceRefresh = false) => {
     setViewState("loading");
     setErrorMessage("");
 
     try {
-      const response = await fetch(`/api/h2h/managers?refresh=${Date.now()}`, {
+      const response = await fetch(
+        forceRefresh ? `/api/h2h/managers?refresh=${Date.now()}` : "/api/h2h/managers",
+        {
         headers: {
           Accept: "application/json",
-          "Cache-Control": "no-cache",
         },
-        cache: "no-store",
-      });
+        cache: forceRefresh ? "no-store" : "default",
+      },
+      );
       if (response.status === 401) {
         setViewState("anonymous");
         return;
@@ -266,7 +268,7 @@ export function H2HPanel() {
           <p className="text-sm text-destructive">
             {errorMessage || "Không thể tải dữ liệu H2H."}
           </p>
-          <Button variant="outline" onClick={() => void loadManagerOptions()}>
+          <Button variant="outline" onClick={() => void loadManagerOptions(true)}>
             Thử lại
           </Button>
         </CardContent>
@@ -341,7 +343,7 @@ export function H2HPanel() {
         </p>
       )}
 
-      <div className="sticky bottom-3 rounded-2xl border bg-background/90 p-3 shadow-xl backdrop-blur">
+      <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom)+0.75rem)] rounded-2xl border bg-background/90 p-3 shadow-xl backdrop-blur md:bottom-3">
         <Button
           className="w-full rounded-xl"
           disabled={!selectedManager}

@@ -113,7 +113,7 @@ async function getBootstrapData(): Promise<any> {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
-        cache: 'no-store',
+        next: { revalidate: 60 },
       },
     );
 
@@ -707,6 +707,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const liveDataByElementId = new Map<number, any>(
+      liveData.elements.map((element: any) => [element.id, element]),
+    );
+    const elementsById = new Map<number, any>(
+      elements.map((element: any) => [element.id, element]),
+    );
+    const teamsById = new Map<number, any>(
+      teams.map((team: any) => [team.id, team]),
+    );
+    const fixturesById = new Map<string, any>(
+      fixtureData.map((fixture: any) => [String(fixture.fixtureId), fixture]),
+    );
 
     let entriesWithPicks = await Promise.all(
       leagueData.standings.results
@@ -730,23 +742,21 @@ export async function GET(request: NextRequest) {
         );
 
         const picksWithLive = picksData.picks.map((pick: any) => {
-          let live = null;
+          let live: any = null;
           let elementName: string | undefined = undefined;
           let avatar: string | undefined = undefined;
           let clubName: string | undefined = undefined;
           let elementType: number | undefined = undefined;
 
           if (liveData) {
-            live =
-              liveData.elements.find((el: any) => el.id === pick.element) ||
-              null;
+            live = liveDataByElementId.get(pick.element) || null;
           }
           if (elements) {
-            const player = elements.find((el: any) => el.id === pick.element);
+            const player = elementsById.get(pick.element);
             elementName = player ? player.web_name : undefined;
             avatar = player ? `${player.code}.png` : undefined;
             elementType = player ? player.element_type : undefined;
-            const team = teams.find((t: any) => t.id === player.team);
+            const team = player ? teamsById.get(player.team) : undefined;
             clubName = team ? team.name : undefined;
           }
 
@@ -756,8 +766,8 @@ export async function GET(request: NextRequest) {
             avatar,
             clubName,
             element_type: elementType,
-            explain: live.explain,
-            stats: live.stats,
+            explain: live?.explain ?? [],
+            stats: live?.stats ?? {},
           };
         });
 
@@ -766,9 +776,7 @@ export async function GET(request: NextRequest) {
           if (Array.isArray(pick.explain)) {
             // 1️⃣ Update explain array with bonus
             pick.explain = pick.explain.map((exp: any) => {
-              const fixture = fixtureData.find(
-                (b: any) => String(b.fixtureId) === String(exp.fixture),
-              );
+              const fixture = fixturesById.get(String(exp.fixture));
 
               const match_status = getMatchStatus(fixture, exp);
               const isFinished = fixture?.finished_provisional === true;
@@ -912,6 +920,7 @@ export async function GET(request: NextRequest) {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
       },
     });
   } catch (error) {

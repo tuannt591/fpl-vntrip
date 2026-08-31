@@ -8,7 +8,6 @@ import { ManagerAccordionList } from './ui/manager-accordion-list';
 import { Button } from './ui/button';
 import { LeaderboardEntry, TeamConfig, TeamStats, TeamWeeklyData } from '@/types/fantasy';
 import { VNTRIP_LEAGUE_ID, CURRENT_PHASE } from '@/lib/fpl-config';
-import Link from 'next/link';
 
 const fetchFantasyVntripData = async (
   leagueId: string,
@@ -117,17 +116,12 @@ export const FantasyLeaderboard = () => {
   const [teamStats, setTeamStats] = useState<TeamStats[]>([]);
   const [currentGW, setCurrentGW] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [mounted, setMounted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [selectedGW, setSelectedGW] = useState<number>(0);
   const [teamWeeklyData, setTeamWeeklyData] = useState<TeamWeeklyData | null>(null);
   const [selectedTeamDialog, setSelectedTeamDialog] = useState<string | null>(null);
   const currentLeagueId = VNTRIP_LEAGUE_ID;
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const reloadData = () => {
     setReloadKey(prev => prev + 1);
@@ -136,19 +130,16 @@ export const FantasyLeaderboard = () => {
 
   useEffect(() => {
     const loadAllData = async () => {
-      if (!mounted) return;
-
       setIsLoading(true);
       setError(null);
 
       try {
         const result = await fetchFantasyVntripData(currentLeagueId, CURRENT_PHASE, selectedGW);
-        console.log('----result----', result);
 
         setLeaderboardData(result.entries);
         setCurrentGW(result.currentGW);
         setTeamStats(calculateTeamStats(result.entries));
-        if (result.teamWeeklyData) setTeamWeeklyData(result.teamWeeklyData);
+        setTeamWeeklyData(result.teamWeeklyData ?? null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error loading data');
         setLeaderboardData([]);
@@ -160,7 +151,7 @@ export const FantasyLeaderboard = () => {
     };
 
     loadAllData();
-  }, [mounted, currentLeagueId, reloadKey, selectedGW]);
+  }, [currentLeagueId, reloadKey, selectedGW]);
 
   // Get record for selected team in dialog
   const selectedTeamRecord = selectedTeamDialog && teamWeeklyData
@@ -179,26 +170,6 @@ export const FantasyLeaderboard = () => {
     <div className="container mx-auto py-4 px-2">
       <Card className='border-none shadow-none bg-transparent'>
         <CardHeader className='px-0 pt-0'>
-          <div className="mb-3 grid grid-cols-3 gap-2 rounded-xl bg-muted p-1">
-            <Button
-              type="button"
-              variant="default"
-              size="sm"
-            >
-              BXH
-            </Button>
-            <Button
-              asChild
-              variant="ghost"
-              size="sm"
-            >
-              <Link href="/h2h">H2H</Link>
-            </Button>
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/chat">Chat</Link>
-            </Button>
-          </div>
-
           <div className="flex items-center justify-between gap-2">
             <div>
               Gameweek:&nbsp;
@@ -275,7 +246,7 @@ export const FantasyLeaderboard = () => {
 
             <div className="relative">
               {/* Sticky Header */}
-              <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 shadow-sm rounded-t-md">
+              <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 rounded-t-md bg-white shadow-sm dark:bg-gray-900 md:top-0">
                 <div className="flex gap-2 p-2 font-semibold text-xs sm:text-sm border-b">
                   <div className="w-16 sm:w-20">Team</div>
                   <div className='flex-1 min-w-0'>Manager</div>

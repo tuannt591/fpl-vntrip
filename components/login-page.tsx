@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
+import { useAuthSession } from "@/components/auth/auth-session-provider";
 import { AuthLoading } from "@/components/chat/auth-loading";
 import { EmailLogin } from "@/components/chat/email-login";
-import {
-  AUTH_STORAGE_KEY,
-  type AuthSession,
-} from "@/components/chat/types";
+import { type AuthSession } from "@/components/chat/types";
 
 function getSafeNextPath() {
   const nextPath = new URLSearchParams(window.location.search).get("next");
@@ -17,32 +16,22 @@ function getSafeNextPath() {
 }
 
 export function LoginPage() {
+  const router = useRouter();
+  const { clearSession, isSessionReady, saveSession, session } = useAuthSession();
   const [isRestoringSession, setIsRestoringSession] = useState(true);
-
-  const redirectAfterLogin = () => {
-    window.location.replace(getSafeNextPath());
-  };
+  const hasRestoredSession = useRef(false);
 
   useEffect(() => {
+    if (!isSessionReady) return;
+
+    if (!session || hasRestoredSession.current) {
+      setIsRestoringSession(false);
+      return;
+    }
+
+    hasRestoredSession.current = true;
     const restoreSession = async () => {
       try {
-        const previousSession = window.sessionStorage.getItem(AUTH_STORAGE_KEY);
-        window.sessionStorage.removeItem(AUTH_STORAGE_KEY);
-        const storedSession =
-          window.localStorage.getItem(AUTH_STORAGE_KEY) || previousSession;
-
-        if (!storedSession) return;
-
-        const parsedSession = JSON.parse(storedSession) as Partial<AuthSession>;
-        if (
-          typeof parsedSession.token !== "string" ||
-          typeof parsedSession.email !== "string"
-        ) {
-          window.localStorage.removeItem(AUTH_STORAGE_KEY);
-          return;
-        }
-
-        const session = parsedSession as AuthSession;
         const response = await fetch("/api/auth/session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -55,17 +44,17 @@ export function LoginPage() {
 
         if (!response.ok) throw new Error("Phiên đăng nhập đã hết hạn.");
 
-        window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
-        redirectAfterLogin();
+        saveSession(session);
+        router.replace(getSafeNextPath());
       } catch {
-        window.localStorage.removeItem(AUTH_STORAGE_KEY);
+        clearSession();
       } finally {
         setIsRestoringSession(false);
       }
     };
 
     void restoreSession();
-  }, []);
+  }, [clearSession, isSessionReady, router, saveSession, session]);
 
   const handleAuthenticated = async (session: AuthSession) => {
     const response = await fetch("/api/auth/session", {
@@ -86,11 +75,12 @@ export function LoginPage() {
     }
     if (!response.ok) throw new Error("Không thể tạo phiên đăng nhập.");
 
-    window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
-    redirectAfterLogin();
+    hasRestoredSession.current = true;
+    saveSession(session);
+    router.replace(getSafeNextPath());
   };
 
-  if (isRestoringSession) {
+  if (!isSessionReady || isRestoringSession) {
     return <AuthLoading message="Đang kiểm tra phiên đăng nhập..." />;
   }
 
