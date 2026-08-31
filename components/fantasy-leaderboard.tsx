@@ -23,6 +23,12 @@ type FantasyLeaderboardResponse = {
 
 type TeamFilter = "all" | "Vinno" | "Americano";
 
+const TEAM_FILTERS: ReadonlyArray<readonly [TeamFilter, string]> = [
+  ["all", "Tất cả"],
+  ["Vinno", "Vinno"],
+  ["Americano", "Americano"],
+];
+
 const fetchFantasyVntripData = async (
   leagueId: string,
   phase: number = 1,
@@ -216,6 +222,7 @@ export const FantasyLeaderboard = () => {
 
     return matchesTeam && matchesQuery;
   });
+  const activeTeamFilterIndex = TEAM_FILTERS.findIndex(([filter]) => filter === teamFilter);
   const highestTeamPoints = Math.max(...teamStats.map((team) => team.totalPoints), 0);
   const teamPointGap =
     teamStats.length === 2
@@ -381,20 +388,24 @@ export const FantasyLeaderboard = () => {
                   <div
                     role="tablist"
                     aria-label="Lọc theo đội"
-                    className="grid grid-cols-3 rounded-xl bg-muted p-1 text-xs font-semibold"
+                    className="relative grid grid-cols-3 rounded-xl bg-muted p-1 text-xs font-semibold"
                   >
-                    {([
-                      ["all", "Tất cả"],
-                      ["Vinno", "Vinno"],
-                      ["Americano", "Americano"],
-                    ] as const).map(([filter, label]) => (
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute bottom-1 left-1 top-1 rounded-lg bg-background shadow-sm transition-transform duration-300 ease-out motion-reduce:transition-none"
+                      style={{
+                        width: "calc((100% - 0.5rem) / 3)",
+                        transform: `translateX(${activeTeamFilterIndex * 100}%)`,
+                      }}
+                    />
+                    {TEAM_FILTERS.map(([filter, label]) => (
                       <button
                         key={filter}
                         type="button"
                         role="tab"
                         aria-selected={teamFilter === filter}
                         onClick={() => setTeamFilter(filter)}
-                        className={`h-8 rounded-lg px-3 transition ${teamFilter === filter ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                        className={`relative z-10 h-8 rounded-lg px-3 transition-colors duration-200 motion-reduce:transition-none ${teamFilter === filter ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
                       >
                         {label}
                       </button>
