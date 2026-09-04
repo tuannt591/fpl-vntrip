@@ -1,42 +1,13 @@
-import { useEffect, useState } from "react";
+import { type TouchEvent, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import Image from "next/image";
+import { CircleDollarSign, UserRoundCheck } from "lucide-react";
 import { LeaderboardEntry, PlayerMatchStatus } from "@/types/fantasy";
 
 interface ManagerAccordionListProps {
   managers: LeaderboardEntry[];
-}
-
-function AnimatedGameweekScore({ value }: { value: number }) {
-  const [displayedValue, setDisplayedValue] = useState(0);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setDisplayedValue(value);
-      return;
-    }
-
-    let frameId = 0;
-    const startedAt = performance.now();
-    const duration = 320;
-
-    const tick = (now: number) => {
-      const progress = Math.min((now - startedAt) / duration, 1);
-      const easedProgress = 1 - Math.pow(1 - progress, 3);
-      setDisplayedValue(Math.round(value * easedProgress));
-
-      if (progress < 1) frameId = requestAnimationFrame(tick);
-    };
-
-    setDisplayedValue(0);
-    frameId = requestAnimationFrame(tick);
-
-    return () => cancelAnimationFrame(frameId);
-  }, [value]);
-
-  return <>{displayedValue}</>;
 }
 
 export const ManagerAccordionList = ({
@@ -45,6 +16,21 @@ export const ManagerAccordionList = ({
   const [selectedPlayer, setSelectedPlayer] = useState<any | null>(null);
   const [openItems, setOpenItems] = useState<string[]>([]);
   const [selectedAvatar, setSelectedAvatar] = useState<{ src: string; name: string } | null>(null);
+  const playerSheetTouchStartYRef = useRef<number | null>(null);
+
+  const handlePlayerSheetTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    playerSheetTouchStartYRef.current = event.touches[0]?.clientY ?? null;
+  };
+
+  const handlePlayerSheetTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
+    const startY = playerSheetTouchStartYRef.current;
+    const endY = event.changedTouches[0]?.clientY;
+    playerSheetTouchStartYRef.current = null;
+
+    if (startY !== null && endY && endY - startY > 56) {
+      setSelectedPlayer(null);
+    }
+  };
 
   const CHIP_CONFIG: Record<string, { label: string; variant: "secondary" | "destructive" | "default" | "outline" | "success" | "warning" }> = {
     wildcard: { label: "WC", variant: "destructive" },
@@ -105,9 +91,16 @@ export const ManagerAccordionList = ({
     ];
 
     return (
-      <Dialog open={!!selectedPlayer} onOpenChange={() => setSelectedPlayer(null)}>
-        <DialogContent className="fpl-player-detail-dialog flex flex-col left-0 right-0 top-auto bottom-0 max-h-[88dvh] max-w-none translate-x-0 translate-y-0 gap-0 overflow-y-auto rounded-t-3xl border-x-0 border-b-0 bg-background p-0 shadow-2xl data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom [&>button]:right-3 [&>button]:top-3 [&>button]:z-10 [&>button]:rounded-full [&>button]:bg-background/85 [&>button]:p-1 [&>button]:shadow-sm sm:left-[50%] sm:right-auto sm:top-[50%] sm:max-w-lg sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-3xl sm:border sm:[&>button]:right-4 sm:[&>button]:top-4 sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95">
-          <div aria-hidden className="pointer-events-none absolute left-1/2 top-2 z-10 h-1 w-10 -translate-x-1/2 rounded-full bg-muted-foreground/25 sm:hidden" />
+      <Dialog open={!!selectedPlayer} onOpenChange={(open) => !open && setSelectedPlayer(null)}>
+        <DialogContent className="fpl-player-detail-dialog flex flex-col left-0 right-0 top-auto bottom-0 max-h-[88dvh] max-w-none translate-x-0 translate-y-0 gap-0 overflow-y-auto rounded-t-[1.5rem] border-x-0 border-b-0 bg-popover/95 p-0 shadow-2xl backdrop-blur-xl max-sm:data-[state=closed]:![--tw-exit-scale:1] max-sm:data-[state=closed]:![--tw-exit-translate-x:0] max-sm:data-[state=closed]:![--tw-exit-translate-y:100%] max-sm:data-[state=open]:![--tw-enter-scale:1] max-sm:data-[state=open]:![--tw-enter-translate-x:0] max-sm:data-[state=open]:![--tw-enter-translate-y:100%] [&>button]:right-3 [&>button]:top-3 [&>button]:z-10 [&>button]:rounded-full [&>button]:bg-background/85 [&>button]:p-1 [&>button]:shadow-sm sm:left-[50%] sm:right-auto sm:top-[50%] sm:max-w-lg sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-3xl sm:border sm:bg-background sm:backdrop-blur-none sm:[&>button]:right-4 sm:[&>button]:top-4 sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95">
+          <div
+            aria-hidden="true"
+            onTouchStart={handlePlayerSheetTouchStart}
+            onTouchEnd={handlePlayerSheetTouchEnd}
+            className="absolute inset-x-0 top-0 z-10 flex h-7 justify-center pt-2 sm:hidden"
+          >
+            <span className="h-1 w-10 rounded-full bg-muted-foreground/25" />
+          </div>
 
           <section className="fpl-player-detail-hero relative shrink-0 overflow-hidden border-b bg-gradient-to-br from-primary/15 via-primary/[0.06] to-transparent px-4 pb-4 pt-5 sm:min-h-[134px] sm:px-6 sm:py-6">
             <div className="absolute -right-10 -top-14 h-36 w-36 rounded-full bg-primary/10 blur-2xl" />
@@ -140,7 +133,7 @@ export const ManagerAccordionList = ({
               )}
 
               <div className="min-w-0 self-center pr-10 sm:pr-0">
-                <p className="truncate text-lg font-black tracking-tight sm:text-xl">{elementName}</p>
+                <DialogTitle className="truncate text-lg font-black tracking-tight sm:text-xl">{elementName}</DialogTitle>
                 <p className="mt-0.5 truncate text-sm text-muted-foreground">{clubName || "Premier League"}</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   <span className="rounded-full bg-background/80 px-2 py-1 text-[11px] font-semibold text-foreground shadow-sm">
@@ -154,7 +147,7 @@ export const ManagerAccordionList = ({
 
               <div className="fpl-player-detail-score col-span-2 flex w-full items-center justify-between rounded-2xl border border-border/70 bg-background/65 px-3 py-2 shadow-sm sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:min-w-[5.75rem] sm:self-stretch sm:flex-col sm:justify-center sm:px-3 sm:text-right">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Gameweek</p>
-                <p className={`font-mono text-2xl font-black leading-none sm:mt-1 sm:text-3xl ${displayedPoints >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-500"}`}><AnimatedGameweekScore value={displayedPoints} /></p>
+                <p className={`font-mono text-2xl font-black leading-none sm:mt-1 sm:text-3xl ${displayedPoints >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-500"}`}>{displayedPoints}</p>
                 <p className="text-[11px] font-medium text-muted-foreground">điểm</p>
               </div>
             </div>
@@ -257,8 +250,7 @@ export const ManagerAccordionList = ({
         className="px-2 py-1 sm:px-3"
       >
         {managers.map((entry) => {
-          const captain = entry?.picks.find(p => p.is_captain);
-          const viceCaptain = entry?.picks.find(p => p.is_vice_captain);
+          const captain = entry.picks?.find((pick) => pick.is_captain);
           const transferCost = entry?.entryHistory?.transferCost;
           const isOpen = openItems.includes(entry.entry.toString());
 
@@ -271,94 +263,83 @@ export const ManagerAccordionList = ({
                 : "border-border/70 hover:border-primary/30 hover:shadow-sm"
                 }`}
             >
-              <AccordionTrigger className="flex w-full items-center gap-2 rounded-xl py-2.5 text-xs sm:py-3 sm:text-sm">
-                <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg font-mono text-xs font-black sm:h-8 sm:w-8 ${getRankClass(entry.rank)}`}>
-                  {entry.rank}
-                </div>
+              <AccordionTrigger className="w-full items-center gap-2 rounded-xl py-2.5 text-xs sm:py-3 sm:text-sm">
+                <div className="flex min-w-0 flex-1 flex-col gap-2 text-left">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg font-mono text-xs font-black sm:h-8 sm:w-8 ${getRankClass(entry.rank)}`}>
+                      {entry.rank}
+                    </div>
 
-                <div className={`w-16 shrink-0 sm:w-20 ${getColorByTeam(entry.team)}`}>
-                  <p className="truncate text-xs font-bold sm:text-sm">{entry.team}</p>
-                </div>
+                    {entry.managerAvatar && (
+                      <Image
+                        src={entry.managerAvatar}
+                        alt={entry.manager}
+                        width={32}
+                        height={32}
+                        className="h-7 w-7 shrink-0 cursor-pointer rounded-full object-cover ring-1 ring-border sm:h-8 sm:w-8"
+                        unoptimized
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSelectedAvatar({ src: entry.managerAvatar!, name: entry.manager });
+                        }}
+                      />
+                    )}
 
-                <div className="flex min-w-0 flex-1 items-center gap-2 text-left">
-                  {entry.managerAvatar && (
-                    <Image
-                      src={entry.managerAvatar}
-                      alt={entry.manager}
-                      width={32}
-                      height={32}
-                      className="h-7 w-7 shrink-0 cursor-pointer rounded-full object-cover ring-1 ring-border transition-all hover:ring-2 hover:ring-primary sm:h-8 sm:w-8"
-                      unoptimized
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedAvatar({ src: entry.managerAvatar!, name: entry.manager });
-                      }}
-                    />
-                  )}
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-semibold sm:text-sm">{entry.teamName}</p>
-                    <p className="truncate text-[10px] text-muted-foreground sm:text-xs">
-                      {entry.manager}
-                    </p>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-semibold sm:text-sm">{entry.teamName}</p>
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <p className="truncate text-[10px] text-muted-foreground sm:text-xs">{entry.manager}</p>
+                        {renderActiveChip(entry.activeChip)}
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 text-right">
+                      <p className={`truncate text-[10px] font-bold sm:text-xs ${getColorByTeam(entry.team)}`}>{entry.team}</p>
+                      <p className="font-mono text-base font-black leading-none text-emerald-700 dark:text-emerald-400 sm:text-lg">{entry.gwPoint}</p>
+                    </div>
                   </div>
-                </div>
 
-                <div className="w-16 text-center sm:w-20 md:w-24">
-                  {captain && <p className="truncate text-[10px] font-medium sm:text-xs">{captain.elementName}</p>}
-                  {viceCaptain && <p className="truncate text-[9px] text-muted-foreground sm:text-[10px]">{viceCaptain.elementName}</p>}
-                </div>
+                  <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] text-muted-foreground sm:text-xs">
+                    {captain && (
+                      <span className="inline-flex min-w-0 items-center gap-1">
+                        <span className="rounded bg-amber-400/20 px-1 py-px text-[9px] font-black text-amber-800 dark:text-amber-300">C</span>
+                        <span className="max-w-[7rem] truncate font-medium text-foreground sm:max-w-[10rem]">{captain.elementName}</span>
+                      </span>
+                    )}
+                    <span aria-hidden className="text-muted-foreground/60">·</span>
+                    <span className="inline-flex items-center gap-1" title="Cầu thủ đã thi đấu">
+                      <UserRoundCheck className="h-3 w-3 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+                      <span>{entry.playedInfo ? `${entry.playedInfo.played}/${entry.playedInfo.total}` : "—"}</span>
+                      <span className="sr-only">cầu thủ đã thi đấu</span>
+                    </span>
+                    <span aria-hidden className="text-muted-foreground/60">·</span>
+                    <span className="inline-flex items-center gap-1" title="Team value">
+                      <CircleDollarSign className="h-3 w-3 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+                      <span className="font-medium text-foreground">{entry.entryHistory?.value !== undefined ? `${(entry.entryHistory.value / 10).toFixed(1)}m` : "—"}</span>
+                      <span className="sr-only">team value</span>
+                    </span>
+                  </div>
 
-                <div className="w-10 text-center sm:w-12">
-                  <p className="font-mono text-base font-black text-emerald-700 dark:text-emerald-400 sm:text-lg">{entry.gwPoint}</p>
-                  {transferCost ? <p className="text-[10px] sm:text-xs font-medium text-red-500">(-{transferCost})</p> : null}
+                  {entry.transfers?.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 rounded-lg border bg-muted/25 p-1">
+                      {entry.transfers.map((transfer: any, index: number) => (
+                        <span key={`${transfer.element_out}-${transfer.element_in}-${index}`} className="flex min-w-0 max-w-full items-center gap-1 rounded-full bg-background px-2 py-0.5 text-[10px] shadow-sm">
+                          <span className="truncate line-through text-red-500">{transfer.element_out_name}</span>
+                          <span aria-hidden>→</span>
+                          <span className="truncate text-emerald-600 dark:text-emerald-400">{transfer.element_in_name}</span>
+                        </span>
+                      ))}
+                      {transferCost > 0 && (
+                        <span className="shrink-0 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-bold text-red-600 dark:text-red-400">−{transferCost} điểm</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </AccordionTrigger>
 
               <AccordionContent className="px-1 pb-2 pt-2" onClick={(e) => e.stopPropagation()}>
                 {entry.picks ? (
                   <div className="space-y-3">
-                    <section className="overflow-hidden rounded-2xl border bg-muted/25 shadow-sm">
-                      <div className="flex items-start justify-between gap-3 px-3 py-3">
-                        <div className="min-w-0">
-                          <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Match Sheet</p>
-                          <p className="mt-0.5 truncate text-sm font-bold">{entry.teamName}</p>
-                          <p className="truncate text-xs text-muted-foreground">{entry.manager}</p>
-                        </div>
-                        <div className="shrink-0 text-right">
-                          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">GW score</p>
-                          <p className="font-mono text-2xl font-black text-emerald-700 dark:text-emerald-400">{entry.gwPoint}</p>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-3 divide-x border-y bg-background/65 text-center">
-                        <div className="px-1 py-2">
-                          <p className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">Đã đấu</p>
-                          <p className="mt-0.5 text-xs font-bold">{entry.playedInfo ? `${entry.playedInfo.played}/${entry.playedInfo.total}` : "—"}</p>
-                        </div>
-                        <div className="px-1 py-2">
-                          <p className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">Transfer</p>
-                          <p className={`mt-0.5 text-xs font-bold ${transferCost ? "text-red-500" : ""}`}>{transferCost ? `-${transferCost}` : "—"}</p>
-                        </div>
-                        <div className="px-1 py-2">
-                          <p className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">Team value</p>
-                          <p className="mt-0.5 text-xs font-bold">{entry.entryHistory?.value !== undefined ? `${(entry.entryHistory.value / 10).toFixed(1)}m` : "—"}</p>
-                        </div>
-                      </div>
-
-                      {(entry.activeChip || entry?.transfers?.length > 0) && (
-                        <div className="flex flex-wrap items-center gap-1.5 px-3 py-2">
-                          {renderActiveChip(entry.activeChip)}
-                          {entry?.transfers?.map((t: any, idx: number) => (
-                            <span key={idx} className="flex max-w-full items-center gap-1 rounded-full bg-background px-2 py-0.5 text-[10px] shadow-sm">
-                              <span className="truncate line-through text-red-500">{t.element_out_name}</span>
-                              <span>→</span>
-                              <span className="truncate text-emerald-600 dark:text-emerald-400">{t.element_in_name}</span>
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </section>
-
                     <div className="flex items-center justify-between px-1">
                       <div>
                         <h3 className="text-xs font-bold sm:text-sm">Đội hình xuất phát</h3>
@@ -391,10 +372,10 @@ export const ManagerAccordionList = ({
                               key={pick.position}
                               data-selected={selectedPlayer?.element === pick.element || undefined}
                               className={`fpl-player-card flex cursor-pointer items-center gap-1 rounded-xl border p-1.5 text-xs shadow-sm transition-all duration-150 hover:scale-[1.02] hover:shadow-md active:scale-[0.98] sm:gap-2 sm:p-2 ${selectedPlayer?.element === pick.element ? "border-primary/70 ring-2 ring-primary/25" : ""} ${isAutoSubIn
-                                  ? "bg-green-100 dark:bg-green-900/50 border-green-400 dark:border-green-600 ring-1 ring-green-300 dark:ring-green-700"
-                                  : isAutoSubOut
-                                    ? "bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-700 ring-1 ring-red-200 dark:ring-red-800"
-                                    : "bg-background/85 dark:bg-background/85 border-border/70 hover:border-primary/45"
+                                ? "bg-green-100 dark:bg-green-900/50 border-green-400 dark:border-green-600 ring-1 ring-green-300 dark:ring-green-700"
+                                : isAutoSubOut
+                                  ? "bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-700 ring-1 ring-red-200 dark:ring-red-800"
+                                  : "bg-background/85 dark:bg-background/85 border-border/70 hover:border-primary/45"
                                 }`}
                               onClick={() => setSelectedPlayer(pick)}
                               title={isAutoSubOut ? "Không được ra sân" : "Click để xem chi tiết"}

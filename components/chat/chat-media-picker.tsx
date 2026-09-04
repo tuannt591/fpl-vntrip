@@ -123,6 +123,7 @@ export function ChatMediaPicker({
   const [stickerError, setStickerError] = useState("");
   const [giphyError, setGiphyError] = useState("");
   const [hasOpenedGiphy, setHasOpenedGiphy] = useState(false);
+  const [hasOpenedSticker, setHasOpenedSticker] = useState(false);
   const [recentEmojis, setRecentEmojis] = useState<string[]>([]);
   const [isStickerLoading, setIsStickerLoading] = useState(true);
   const pickerRef = useRef<HTMLDivElement>(null);
@@ -146,8 +147,8 @@ export function ChatMediaPicker({
   }, []);
 
   useEffect(() => {
-    setIsStickerLoading(true);
-  }, [stickerIframeUrl]);
+    if (hasOpenedSticker) setIsStickerLoading(true);
+  }, [hasOpenedSticker, stickerIframeUrl]);
 
   useEffect(() => {
     if (!open) return;
@@ -331,6 +332,7 @@ export function ChatMediaPicker({
               aria-selected={activeTab === "sticker"}
               onClick={() => {
                 setStickerError("");
+                setHasOpenedSticker(true);
                 setActiveTab("sticker");
               }}
               className={cn(
@@ -431,15 +433,17 @@ export function ChatMediaPicker({
             role="tabpanel"
             className={cn("h-full", activeTab !== "sticker" && "hidden")}
           >
-            <iframe
-              ref={iframeRef}
-              src={stickerIframeUrl}
-              title="Sticker Picker"
-              aria-label="Chọn sticker"
-              onLoad={() => setIsStickerLoading(false)}
-              className="h-full w-full border-0 bg-background"
-            />
-            {isStickerLoading && (
+            {hasOpenedSticker && (
+              <iframe
+                ref={iframeRef}
+                src={stickerIframeUrl}
+                title="Sticker Picker"
+                aria-label="Chọn sticker"
+                onLoad={() => setIsStickerLoading(false)}
+                className="h-full w-full border-0 bg-background"
+              />
+            )}
+            {hasOpenedSticker && isStickerLoading && (
               <div className="absolute inset-0 grid grid-cols-3 content-start gap-2 bg-background/90 p-3 backdrop-blur-sm">
                 {([0, 1, 2, 3, 4, 5] as const).map((index) => (
                   <Skeleton key={index} className="aspect-square rounded-2xl" />

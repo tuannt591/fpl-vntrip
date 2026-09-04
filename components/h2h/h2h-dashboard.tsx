@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
@@ -38,6 +38,12 @@ import {
   H2HMatchesSkeleton,
 } from "@/components/h2h/h2h-loading-skeleton";
 import { cn } from "@/lib/utils";
+import {
+  ApiRequestError,
+  getCachedMatches,
+  loadMatches as loadCachedMatches,
+  type MatchesResponse,
+} from "@/lib/tab-data";
 import type {
   AppProfile,
   ClaimedManager,
@@ -53,14 +59,6 @@ export type H2HDashboardData = {
   profile: AppProfile;
   myManager: ClaimedManager;
   managers: H2HManagerOption[];
-};
-
-type MatchesResponse = {
-  season: string;
-  leagueId: string;
-  myManager: ClaimedManager | null;
-  gameweek: H2HGameweekContext;
-  matches: H2HGroupMatch[];
 };
 
 type MyRecord = {
@@ -309,78 +307,51 @@ function calculateMyRecord(matches: H2HGroupMatch[], myEntryId: number): MyRecor
 
 export function H2HDashboard({ data }: { data: H2HDashboardData }) {
   const router = useRouter();
-  const [matchesData, setMatchesData] = useState<MatchesResponse | null>(null);
+  const initialMatches = getCachedMatches()?.data;
+  const [matchesData, setMatchesData] = useState<MatchesResponse | null>(
+    () => initialMatches ?? null,
+  );
   const [selectedEntryIds, setSelectedEntryIds] = useState<number[]>([]);
   const [matchFilter, setMatchFilter] = useState<"mine" | "all">("mine");
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [pickerErrorMessage, setPickerErrorMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => !initialMatches);
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteMatch, setDeleteMatch] = useState<H2HGroupMatch | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isRedirecting, setIsRedirecting] = useState(false);
-  const matchesRequestRef = useRef<AbortController | null>(null);
 
   const redirectToLogin = useCallback(() => {
     setIsRedirecting(true);
     router.replace("/login?next=%2Fh2h");
   }, [router]);
 
-  const loadMatches = useCallback(async () => {
-    matchesRequestRef.current?.abort();
-    const controller = new AbortController();
-    matchesRequestRef.current = controller;
-    setIsLoading(true);
+  const loadMatches = useCallback(async (force = false) => {
+    const cached = getCachedMatches();
+    if (cached) setMatchesData(cached.data);
+    setIsLoading(!cached || force);
     setErrorMessage("");
     try {
-      const response = await fetch("/api/h2h/matches", {
-        headers: { Accept: "application/json" },
-        cache: "no-store",
-        signal: controller.signal,
-      });
-      if (controller.signal.aborted) return;
-
-      if (response.status === 401) {
+      const responseData = await loadCachedMatches(force);
+      setMatchesData(responseData);
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.status === 401) {
         redirectToLogin();
         return;
       }
-
-      const responseData = (await response.json()) as
-        | MatchesResponse
-        | { error?: string };
-      if (controller.signal.aborted) return;
-
-      if (!response.ok || !("matches" in responseData)) {
-        throw new Error(
-          "error" in responseData && responseData.error
-            ? responseData.error
-            : "Không thể tải các trận H2H.",
-        );
-      }
-      setMatchesData(responseData);
-    } catch (error) {
-      if (controller.signal.aborted) return;
 
       setErrorMessage(
         error instanceof Error ? error.message : "Không thể tải các trận H2H.",
       );
     } finally {
-      if (matchesRequestRef.current === controller) {
-        matchesRequestRef.current = null;
-        setIsLoading(false);
-      }
+      setIsLoading(false);
     }
   }, [redirectToLogin]);
 
   useEffect(() => {
     void loadMatches();
-    return () => {
-      const controller = matchesRequestRef.current;
-      matchesRequestRef.current = null;
-      controller?.abort();
-    };
   }, [loadMatches]);
 
   useEffect(() => {
@@ -462,7 +433,7 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
       setIsPickerOpen(false);
       setMatchFilter("mine");
       setSuccessMessage("Đã tạo nhóm H2H thành công.");
-      await loadMatches();
+      await loadMatches(true);
     } catch (error) {
       setPickerErrorMessage(
         error instanceof Error ? error.message : "Không thể tạo trận H2H.",
@@ -495,7 +466,7 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
         throw new Error(responseData.error || "Không thể xóa trận H2H.");
       }
       setDeleteMatch(null);
-      await loadMatches();
+      await loadMatches(true);
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Không thể xóa trận H2H.",

@@ -62,6 +62,7 @@ export function MobileTabNav() {
               <Link
                 key={href}
                 href={href}
+                scroll={false}
                 aria-busy={pending || undefined}
                 aria-current={active ? "page" : undefined}
                 onClick={() => {

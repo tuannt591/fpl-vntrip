@@ -4,6 +4,12 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { useAuthSession } from "@/components/auth/auth-session-provider";
+import { CURRENT_PHASE, VNTRIP_LEAGUE_ID } from "@/lib/fpl-config";
+import {
+  loadFantasyLeaderboardData,
+  loadManagerOptions,
+  loadMatches,
+} from "@/lib/tab-data";
 
 const protectedRoutes = ["/h2h", "/chat"];
 
@@ -15,6 +21,11 @@ type IdleCallbackWindow = Window & {
   cancelIdleCallback?: (id: number) => void;
 };
 
+type NetworkInformation = {
+  effectiveType?: string;
+  saveData?: boolean;
+};
+
 export function RoutePrefetcher() {
   const router = useRouter();
   const { isSessionReady, session } = useAuthSession();
@@ -24,6 +35,15 @@ export function RoutePrefetcher() {
 
     const prefetchProtectedRoutes = () => {
       protectedRoutes.forEach((route) => router.prefetch(route));
+      const connection = (navigator as Navigator & { connection?: NetworkInformation })
+        .connection;
+      if (connection?.saveData || connection?.effectiveType === "slow-2g" || connection?.effectiveType === "2g") {
+        return;
+      }
+
+      void loadFantasyLeaderboardData(VNTRIP_LEAGUE_ID, CURRENT_PHASE, 0).catch(() => {});
+      void loadManagerOptions().catch(() => {});
+      void loadMatches().catch(() => {});
     };
     const idleWindow = window as IdleCallbackWindow;
 

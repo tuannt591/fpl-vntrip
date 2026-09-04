@@ -13,13 +13,10 @@ import {
 import { LeaderboardEntry, TeamConfig, TeamStats, TeamWeeklyData } from '@/types/fantasy';
 import { VNTRIP_LEAGUE_ID, CURRENT_PHASE } from '@/lib/fpl-config';
 import { primaryPageContainerClassName } from "@/lib/page-layout";
-
-type FantasyLeaderboardResponse = {
-  entries: LeaderboardEntry[];
-  currentGW: number;
-  teamWeeklyData?: TeamWeeklyData | null;
-  error?: string;
-};
+import {
+  getCachedFantasyLeaderboardData,
+  loadFantasyLeaderboardData,
+} from "@/lib/tab-data";
 
 type TeamFilter = "all" | "Vinno" | "Americano";
 
@@ -28,43 +25,6 @@ const TEAM_FILTERS: ReadonlyArray<readonly [TeamFilter, string]> = [
   ["Vinno", "Vinno"],
   ["Americano", "Americano"],
 ];
-
-const fetchFantasyVntripData = async (
-  leagueId: string,
-  phase: number = 1,
-  gw: number = 0,
-  signal?: AbortSignal,
-): Promise<FantasyLeaderboardResponse> => {
-  const params = new URLSearchParams({
-    leagueId,
-    phase: phase.toString(),
-  });
-
-  if (gw > 0) {
-    params.append('gw', gw.toString());
-  }
-
-  const response = await fetch(`/api/fantasy-vntrip?${params}`, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-    },
-    cache: 'no-store',
-    signal,
-  });
-  const data = (await response.json().catch(() => null)) as
-    | FantasyLeaderboardResponse
-    | null;
-
-  if (!response.ok || !data || !Array.isArray(data.entries)) {
-    throw new Error(
-      data?.error || `Không thể tải bảng xếp hạng (mã ${response.status}).`,
-    );
-  }
-
-  return data;
-};
-
 
 // Team Config
 const TEAMS: TeamConfig[] = [
@@ -132,71 +92,86 @@ const TEAM_COLORS: Record<string, {
 const getTeamShortName = (fullName: string) => fullName;
 
 export const FantasyLeaderboard = () => {
-  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
-  const [teamStats, setTeamStats] = useState<TeamStats[]>([]);
-  const [currentGW, setCurrentGW] = useState<number>(0);
-  const [isLoading, setIsLoading] = useState(true);
+  const currentLeagueId = VNTRIP_LEAGUE_ID;
+  const initialData = getCachedFantasyLeaderboardData(
+    currentLeagueId,
+    CURRENT_PHASE,
+    0,
+  )?.data;
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>(
+    () => initialData?.entries ?? [],
+  );
+  const [teamStats, setTeamStats] = useState<TeamStats[]>(
+    () => (initialData ? calculateTeamStats(initialData.entries) : []),
+  );
+  const [currentGW, setCurrentGW] = useState<number>(() => initialData?.currentGW ?? 0);
+  const [isLoading, setIsLoading] = useState(() => !initialData);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [selectedGW, setSelectedGW] = useState<number>(0);
-  const [teamWeeklyData, setTeamWeeklyData] = useState<TeamWeeklyData | null>(null);
+  const [teamWeeklyData, setTeamWeeklyData] = useState<TeamWeeklyData | null>(
+    () => initialData?.teamWeeklyData ?? null,
+  );
   const [selectedTeamDialog, setSelectedTeamDialog] = useState<string | null>(null);
   const [teamFilter, setTeamFilter] = useState<TeamFilter>("all");
   const [managerQuery, setManagerQuery] = useState("");
-  const [hasLoadedData, setHasLoadedData] = useState(false);
-  const leaderboardRequestRef = useRef<AbortController | null>(null);
-  const currentLeagueId = VNTRIP_LEAGUE_ID;
+  const [hasLoadedData, setHasLoadedData] = useState(() => Boolean(initialData));
+  const forceReloadRef = useRef(false);
 
   const reloadData = () => {
+    forceReloadRef.current = true;
     setReloadKey(prev => prev + 1);
     setSelectedGW(0);
   };
 
   useEffect(() => {
-    leaderboardRequestRef.current?.abort();
-    const controller = new AbortController();
-    leaderboardRequestRef.current = controller;
+    let cancelled = false;
+    const forceReload = forceReloadRef.current;
+    forceReloadRef.current = false;
+    const cached = getCachedFantasyLeaderboardData(
+      currentLeagueId,
+      CURRENT_PHASE,
+      selectedGW,
+    );
+
+    const applyResult = (result: Awaited<ReturnType<typeof loadFantasyLeaderboardData>>) => {
+      setLeaderboardData(result.entries);
+      setCurrentGW(result.currentGW);
+      setTeamStats(calculateTeamStats(result.entries));
+      setTeamWeeklyData(result.teamWeeklyData ?? null);
+      setHasLoadedData(true);
+    };
 
     const loadAllData = async () => {
-      setIsLoading(true);
+      if (cached) applyResult(cached.data);
+      setIsLoading(!cached || forceReload);
       setError(null);
       setSelectedTeamDialog(null);
 
       try {
-        const result = await fetchFantasyVntripData(
+        const result = await loadFantasyLeaderboardData(
           currentLeagueId,
           CURRENT_PHASE,
           selectedGW,
-          controller.signal,
+          forceReload,
         );
-        if (controller.signal.aborted) return;
-
-        setLeaderboardData(result.entries);
-        setCurrentGW(result.currentGW);
-        setTeamStats(calculateTeamStats(result.entries));
-        setTeamWeeklyData(result.teamWeeklyData ?? null);
-        setHasLoadedData(true);
+        if (cancelled) return;
+        applyResult(result);
       } catch (err) {
-        if (controller.signal.aborted) return;
+        if (cancelled) return;
 
         setError(
           err instanceof Error ? err.message : 'Không thể tải bảng xếp hạng.',
         );
       } finally {
-        if (leaderboardRequestRef.current === controller) {
-          leaderboardRequestRef.current = null;
-          setIsLoading(false);
-        }
+        if (!cancelled) setIsLoading(false);
       }
     };
 
     void loadAllData();
 
     return () => {
-      if (leaderboardRequestRef.current === controller) {
-        leaderboardRequestRef.current = null;
-      }
-      controller.abort();
+      cancelled = true;
     };
   }, [currentLeagueId, reloadKey, selectedGW]);
 
@@ -424,16 +399,7 @@ export const FantasyLeaderboard = () => {
                 </div>
 
                 <div className="relative">
-                  <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 border-b bg-background/90 shadow-sm backdrop-blur md:top-0">
-                    <div className="flex items-center gap-2 px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:px-3 sm:text-xs">
-                      <div className="w-8 text-center">#</div>
-                      <div className="w-16 sm:w-20">Team</div>
-                      <div className="min-w-0 flex-1">Manager</div>
-                      <div className="w-16 text-center sm:w-20 md:w-24">(C)</div>
-                      <div className="w-10 text-center sm:w-12">GW</div>
-                      <div className="w-4" />
-                    </div>
-                  </div>
+
 
                   {filteredLeaderboardData.length === 0 ? (
                     <div className="py-10 text-center text-sm text-muted-foreground">

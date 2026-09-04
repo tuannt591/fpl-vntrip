@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -30,21 +30,35 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import {
+  ApiRequestError,
+  getCachedManagerOptions,
+  loadManagerOptions,
+  setCachedManagerOptions,
+  type ManagerOptionsResponse,
+} from "@/lib/tab-data";
 import type {
   AppProfile,
   ClaimedManager,
   H2HManagerOption,
 } from "@/types/h2h";
 
-type ManagerOptionsResponse = {
-  season: string;
-  leagueId: string;
-  profile: AppProfile;
-  myManager: ClaimedManager | null;
-  managers: H2HManagerOption[];
-};
-
 type ViewState = "loading" | "anonymous" | "ready" | "error";
+
+function normalizeManagerOptions(responseData: ManagerOptionsResponse) {
+  const myManager = responseData.myManager;
+  return {
+    ...responseData,
+    myManager,
+    managers: myManager
+      ? responseData.managers.map((manager) => ({
+          ...manager,
+          claimed: manager.claimed || manager.entryId === myManager.entryId,
+          claimedByMe: manager.entryId === myManager.entryId,
+        }))
+      : responseData.managers,
+  };
+}
 
 function ManagerAvatar({ manager }: { manager: H2HManagerOption }) {
   if (manager.managerAvatar) {
@@ -69,86 +83,44 @@ function ManagerAvatar({ manager }: { manager: H2HManagerOption }) {
 
 export function H2HPanel() {
   const router = useRouter();
-  const [viewState, setViewState] = useState<ViewState>("loading");
-  const [data, setData] = useState<ManagerOptionsResponse | null>(null);
+  const initialData = getCachedManagerOptions()?.data;
+  const [viewState, setViewState] = useState<ViewState>(() =>
+    initialData ? "ready" : "loading",
+  );
+  const [data, setData] = useState<ManagerOptionsResponse | null>(
+    () => (initialData ? normalizeManagerOptions(initialData) : null),
+  );
   const [selectedEntryId, setSelectedEntryId] = useState<number | null>(null);
   const [claimDialogOpen, setClaimDialogOpen] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const managerRequestRef = useRef<AbortController | null>(null);
 
-  const loadManagerOptions = useCallback(async () => {
-    managerRequestRef.current?.abort();
-    const controller = new AbortController();
-    managerRequestRef.current = controller;
-    setViewState("loading");
+  const loadManagerData = useCallback(async (force = false) => {
+    const cached = getCachedManagerOptions();
+    if (cached) setData(normalizeManagerOptions(cached.data));
+    if (!cached || force) setViewState("loading");
     setErrorMessage("");
 
     try {
-      const response = await fetch("/api/h2h/managers", {
-        headers: {
-          Accept: "application/json",
-        },
-        cache: "no-store",
-        signal: controller.signal,
-      });
-      if (controller.signal.aborted) return;
-
-      if (response.status === 401) {
+      const responseData = await loadManagerOptions(force);
+      setData(normalizeManagerOptions(responseData));
+      setViewState("ready");
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.status === 401) {
         setViewState("anonymous");
         return;
       }
-
-      const responseData = (await response.json()) as
-        | ManagerOptionsResponse
-        | { error?: string };
-      if (controller.signal.aborted) return;
-
-      if (!response.ok || !("managers" in responseData)) {
-        throw new Error(
-          "error" in responseData && responseData.error
-            ? responseData.error
-            : "Không thể tải danh sách manager.",
-        );
-      }
-
-      const myManager = responseData.myManager;
-
-      setData({
-        ...responseData,
-        myManager,
-        managers: myManager
-          ? responseData.managers.map((manager) => ({
-              ...manager,
-              claimed:
-                manager.claimed || manager.entryId === myManager.entryId,
-              claimedByMe: manager.entryId === myManager.entryId,
-            }))
-          : responseData.managers,
-      });
-      setViewState("ready");
-    } catch (error) {
-      if (controller.signal.aborted) return;
 
       setErrorMessage(
         error instanceof Error ? error.message : "Không thể tải dữ liệu H2H.",
       );
       setViewState("error");
-    } finally {
-      if (managerRequestRef.current === controller) {
-        managerRequestRef.current = null;
-      }
     }
   }, []);
 
   useEffect(() => {
-    void loadManagerOptions();
-    return () => {
-      const controller = managerRequestRef.current;
-      managerRequestRef.current = null;
-      controller?.abort();
-    };
-  }, [loadManagerOptions]);
+    void loadManagerData();
+  }, [loadManagerData]);
 
   useEffect(() => {
     if (viewState === "anonymous") {
@@ -201,6 +173,17 @@ export function H2HPanel() {
             }
           : current,
       );
+      if (data) {
+        setCachedManagerOptions({
+          ...data,
+          myManager: responseData.manager,
+          managers: data.managers.map((manager) => ({
+            ...manager,
+            claimed: manager.claimed || manager.entryId === responseData.manager!.entryId,
+            claimedByMe: manager.entryId === responseData.manager!.entryId,
+          })),
+        });
+      }
       setSelectedEntryId(null);
       setClaimDialogOpen(false);
       window.dispatchEvent(
@@ -230,7 +213,7 @@ export function H2HPanel() {
           <p className="text-sm text-destructive">
             {errorMessage || "Không thể tải dữ liệu H2H."}
           </p>
-          <Button variant="outline" onClick={() => void loadManagerOptions()}>
+          <Button variant="outline" onClick={() => void loadManagerData(true)}>
             Thử lại
           </Button>
         </CardContent>

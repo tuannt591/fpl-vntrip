@@ -1,20 +1,15 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LogOut, UserRound } from "lucide-react";
 import { useAuthSession } from "@/components/auth/auth-session-provider";
+import {
+  type AuthSessionManager,
+  type AuthSessionProfile,
+} from "@/components/chat/types";
 import { cn } from "@/lib/utils";
 import { ToggleTheme } from "./toogle-theme";
-
-type Profile = {
-  email: string;
-  displayName: string | null;
-};
-
-type Manager = {
-  managerAvatar: string | null;
-};
 
 const primaryNavigationItems = [
   { href: "/", label: "BXH" },
@@ -33,61 +28,76 @@ export const Navbar = ({
 }) => {
   const pathname = usePathname();
   const router = useRouter();
-  const { clearSession, isSessionReady, session } = useAuthSession();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [managerAvatar, setManagerAvatar] = useState<string | null>(null);
+  const { clearSession, isSessionReady, saveSession, session } = useAuthSession();
+  const [fallbackProfile, setFallbackProfile] = useState<AuthSessionProfile | null>(null);
+  const [fallbackManager, setFallbackManager] = useState<AuthSessionManager | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const fallbackRequestTokenRef = useRef<string | null>(null);
+  const profile = session?.profile ?? fallbackProfile;
+  const managerAvatar = session?.manager?.managerAvatar ?? fallbackManager?.managerAvatar ?? null;
 
   useEffect(() => {
-    let isMounted = true;
-    let hasReceivedManagerClaim = false;
-
-    const handleManagerClaimed = (event: Event) => {
-      hasReceivedManagerClaim = true;
-      const { managerAvatar } = (
-        event as CustomEvent<{ managerAvatar?: string | null }>
-      ).detail;
-      setManagerAvatar(managerAvatar || null);
-    };
-
-    window.addEventListener("fpl-vntrip:manager-claimed", handleManagerClaimed);
-
     const loadProfile = async () => {
       try {
         if (!isSessionReady) return;
         if (!session) {
-          setProfile(null);
-          setManagerAvatar(null);
+          setFallbackProfile(null);
+          setFallbackManager(null);
           return;
         }
+
+        // New sessions already contain this display data. Retain the endpoint
+        // only as a one-time migration path for sessions stored before it.
+        if (session.profile || fallbackRequestTokenRef.current === session.token) {
+          return;
+        }
+        fallbackRequestTokenRef.current = session.token;
 
         const response = await fetch("/api/auth/me");
         if (!response.ok) return;
 
         const data = (await response.json()) as {
-          profile?: Profile;
-          manager?: Manager | null;
+          profile?: AuthSessionProfile;
+          manager?: AuthSessionManager | null;
         };
-        if (!isMounted || !data.profile) return;
+        if (!data.profile) return;
 
-        setProfile(data.profile);
-        if (!hasReceivedManagerClaim) {
-          setManagerAvatar(data.manager?.managerAvatar || null);
-        }
+        setFallbackProfile(data.profile);
+        setFallbackManager(data.manager ?? null);
+        saveSession({
+          ...session,
+          profile: data.profile,
+          manager: data.manager ?? null,
+        });
       } catch {
         // A missing or expired session simply leaves the profile box hidden.
       }
     };
 
     void loadProfile();
+  }, [isSessionReady, saveSession, session]);
+
+  useEffect(() => {
+    const handleManagerClaimed = (event: Event) => {
+      if (!session) return;
+
+      const { managerAvatar } = (
+        event as CustomEvent<{ managerAvatar?: string | null }>
+      ).detail;
+      const manager = { managerAvatar: managerAvatar || null };
+
+      setFallbackManager(manager);
+      saveSession({ ...session, manager });
+    };
+
+    window.addEventListener("fpl-vntrip:manager-claimed", handleManagerClaimed);
     return () => {
-      isMounted = false;
       window.removeEventListener(
         "fpl-vntrip:manager-claimed",
         handleManagerClaimed,
       );
     };
-  }, [clearSession, isSessionReady, session]);
+  }, [saveSession, session]);
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
@@ -98,8 +108,8 @@ export const Navbar = ({
       if (!response.ok) return;
 
       clearSession();
-      setProfile(null);
-      setManagerAvatar(null);
+      setFallbackProfile(null);
+      setFallbackManager(null);
       router.replace("/");
     } finally {
       setIsLoggingOut(false);

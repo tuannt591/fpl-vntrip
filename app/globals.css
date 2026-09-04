@@ -172,29 +172,6 @@ html {
   100% { transform: scale(1); }
 }
 
-@keyframes fpl-player-detail-reveal {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fpl-player-score-pop {
-  0% {
-    opacity: 0;
-    transform: translateY(5px) scale(0.92);
-  }
-  70% { transform: translateY(0) scale(1.04); }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
 .fpl-player-card {
   -webkit-tap-highlight-color: transparent;
   will-change: transform;
@@ -208,42 +185,9 @@ html {
   animation: fpl-player-card-focus 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-hero {
-  animation: fpl-player-detail-reveal 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-score {
-  animation: fpl-player-score-pop 300ms 90ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-fixture,
-.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-stats,
-.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-extra {
-  animation: fpl-player-detail-reveal 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-fixture { animation-delay: 110ms; }
-.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-stats { animation-delay: 145ms; }
-.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-extra { animation-delay: 180ms; }
-
-.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-stat {
-  animation: fpl-player-detail-reveal 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-stat:nth-child(1) { animation-delay: 190ms; }
-.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-stat:nth-child(2) { animation-delay: 225ms; }
-.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-stat:nth-child(3) { animation-delay: 260ms; }
-.fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-stat:nth-child(4) { animation-delay: 295ms; }
-
 @media (prefers-reduced-motion: reduce) {
   .fpl-player-card,
-  .fpl-player-card[data-selected="true"],
-  .fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-hero,
-  .fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-score,
-  .fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-fixture,
-  .fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-stats,
-  .fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-extra,
-  .fpl-player-detail-dialog[data-state="open"] .fpl-player-detail-stat {
+  .fpl-player-card[data-selected="true"] {
     animation: none;
     transition-duration: 0.01ms;
   }
