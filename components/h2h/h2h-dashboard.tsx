@@ -507,7 +507,7 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
           </div>
           <button
             type="button"
-            onClick={() => void loadMatches()}
+            onClick={() => void loadMatches(true)}
             disabled={isLoading}
             aria-label="Tải lại"
             className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted disabled:opacity-50"
