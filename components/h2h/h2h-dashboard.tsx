@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
@@ -314,6 +314,7 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
   const [selectedEntryIds, setSelectedEntryIds] = useState<number[]>([]);
   const [matchFilter, setMatchFilter] = useState<"mine" | "all">("mine");
   const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [createdMatch, setCreatedMatch] = useState<H2HGroupMatch | null>(null);
   const [pickerErrorMessage, setPickerErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(() => !initialMatches);
   const [isCreating, setIsCreating] = useState(false);
@@ -322,6 +323,7 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const matchesSectionRef = useRef<HTMLElement>(null);
 
   const redirectToLogin = useCallback(() => {
     setIsRedirecting(true);
@@ -355,6 +357,16 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
   }, [loadMatches]);
 
   useEffect(() => {
+    const claimedTeamName = window.sessionStorage.getItem(
+      "fpl-vntrip:h2h-claim-success",
+    );
+    if (claimedTeamName !== data.myManager.teamName) return;
+
+    window.sessionStorage.removeItem("fpl-vntrip:h2h-claim-success");
+    setSuccessMessage(`${claimedTeamName} đã sẵn sàng cho H2H Arena.`);
+  }, [data.myManager.teamName]);
+
+  useEffect(() => {
     if (!successMessage) return;
 
     const timeoutId = window.setTimeout(() => setSuccessMessage(""), 4000);
@@ -376,8 +388,9 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
     () => calculateMyRecord(matches, data.myManager.entryId),
     [data.myManager.entryId, matches],
   );
-  const selectedManagers = data.managers.filter((manager) =>
-    selectedEntryIds.includes(manager.entryId),
+  const hasCompletedMatches = record.wins + record.draws + record.losses > 0;
+  const readyOpponents = data.managers.filter(
+    (manager) => !manager.claimedByMe && manager.claimed,
   );
   const deadline = formatDeadline(
     matchesData?.gameweek.creationDeadlineTime ?? null,
@@ -400,6 +413,12 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
         : [...current, entryId],
     );
     setPickerErrorMessage("");
+  };
+
+  const openMatchPicker = () => {
+    setPickerErrorMessage("");
+    setCreatedMatch(null);
+    setIsPickerOpen(true);
   };
 
   const createMatch = async () => {
@@ -430,10 +449,10 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
       }
 
       setSelectedEntryIds([]);
-      setIsPickerOpen(false);
+      setCreatedMatch(responseData.match);
       setMatchFilter("mine");
       setSuccessMessage("Đã tạo nhóm H2H thành công.");
-      await loadMatches(true);
+      void loadMatches(true);
     } catch (error) {
       setPickerErrorMessage(
         error instanceof Error ? error.message : "Không thể tạo trận H2H.",
@@ -496,13 +515,17 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
 
   return (
     <div className="w-full space-y-5">
-      <section className="rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
+      <section className="rounded-2xl border bg-card p-3 shadow-sm sm:p-4">
         <div className="flex items-center gap-3">
-          <Avatar manager={data.myManager} />
+          <Avatar manager={data.myManager} size="sm" />
           <div className="min-w-0 flex-1">
             <p className="truncate font-bold">{data.myManager.teamName}</p>
-            <p className="truncate text-xs text-muted-foreground">
-              {data.myManager.managerName} · Mùa {data.season}
+            <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+              <span className="truncate">{data.myManager.managerName}</span>
+              <span aria-hidden="true">·</span>
+              <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-emerald-700 dark:text-emerald-400">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Đã xác nhận
+              </span>
             </p>
           </div>
           <button
@@ -516,20 +539,22 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
           </button>
         </div>
 
-        <div className="mt-4 grid grid-cols-3 divide-x rounded-xl bg-muted/55 py-2.5">
-          {[
-            ["Thắng", record.wins, "text-emerald-600"],
-            ["Hòa", record.draws, "text-amber-600"],
-            ["Thua", record.losses, "text-destructive"],
-          ].map(([label, value, className]) => (
-            <div key={String(label)} className="text-center">
-              <p className={cn("font-mono text-lg font-black", className)}>{value}</p>
-              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                {label}
-              </p>
-            </div>
-          ))}
-        </div>
+        {hasCompletedMatches && (
+          <div className="mt-3 grid grid-cols-3 divide-x rounded-xl bg-muted/55 py-2">
+            {[
+              ["Thắng", record.wins, "text-emerald-600"],
+              ["Hòa", record.draws, "text-amber-600"],
+              ["Thua", record.losses, "text-destructive"],
+            ].map(([label, value, className]) => (
+              <div key={String(label)} className="text-center">
+                <p className={cn("font-mono text-base font-black", className)}>{value}</p>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  {label}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {errorMessage && (
@@ -560,31 +585,38 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
         </div>
       )}
 
-      <section className="rounded-2xl border bg-card p-4 shadow-sm">
+      <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
         <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="font-bold">Tạo nhóm H2H</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {canCreate
-                ? `GW ${matchesData?.gameweek.creationGameweek} · hạn ${deadline}`
-                : "Chưa có gameweek mở đăng ký"}
-            </p>
+          <div className="flex min-w-0 items-center gap-3 p-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-sm font-black text-primary-foreground">
+              {matchesData?.gameweek.creationGameweek ?? "—"}
+            </div>
+            <div className="min-w-0">
+              <p className="font-bold">Tạo nhóm H2H</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {canCreate
+                  ? `GW ${matchesData?.gameweek.creationGameweek} · hạn ${deadline ?? "chưa có"}`
+                  : "Chưa có gameweek mở đăng ký"}
+              </p>
+            </div>
           </div>
           <Button
             size="sm"
-            className="gap-1.5 rounded-xl"
+            className="mr-4 shrink-0 gap-1.5 rounded-xl"
             disabled={!canCreate || isLoading}
-            onClick={() => {
-              setPickerErrorMessage("");
-              setIsPickerOpen(true);
-            }}
+            onClick={openMatchPicker}
           >
             <Plus className="h-4 w-4" /> Tạo nhóm
           </Button>
         </div>
+        <p className="border-t bg-muted/30 px-4 py-2 text-xs text-muted-foreground">
+          {canCreate
+            ? "Chọn những manager đã xác nhận để cùng so điểm gameweek."
+            : "Tạo nhóm sẽ khả dụng khi gameweek tiếp theo mở đăng ký."}
+        </p>
       </section>
 
-      <section className="space-y-3">
+      <section ref={matchesSectionRef} className="space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="font-bold">Trận đấu</h2>
@@ -637,10 +669,24 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
             <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
               <Users className="h-5 w-5" />
             </div>
-            <p className="mt-3 text-sm font-semibold">Chưa có trận đấu</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Tạo một nhóm để bắt đầu so điểm gameweek.
+            <p className="mt-3 text-sm font-semibold">
+              {matchFilter === "mine" ? "Bạn chưa có trận đấu" : "Chưa có trận đấu"}
             </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {matchFilter === "mine"
+                ? "Tạo nhóm đầu tiên để bắt đầu so điểm gameweek."
+                : "Chưa có nhóm nào được tạo trong league."}
+            </p>
+            {matchFilter === "mine" && (
+              <Button
+                size="sm"
+                className="mt-4 gap-1.5 rounded-xl"
+                disabled={!canCreate}
+                onClick={openMatchPicker}
+              >
+                <Plus className="h-4 w-4" /> Tạo trận đầu tiên
+              </Button>
+            )}
           </div>
         )}
       </section>
@@ -649,98 +695,125 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
         open={isPickerOpen}
         onOpenChange={(open) => {
           setIsPickerOpen(open);
-          if (!open) setPickerErrorMessage("");
+          if (!open) {
+            setPickerErrorMessage("");
+            setCreatedMatch(null);
+          }
         }}
       >
-        <DialogContent className="flex max-h-[86dvh] max-w-md flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:rounded-2xl">
-          <DialogHeader className="border-b px-5 pb-4 pt-5">
-            <DialogTitle>Chọn đối thủ</DialogTitle>
-            <DialogDescription>
-              Có thể chọn nhiều người.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            {pickerErrorMessage && (
-              <div className="mb-3 flex items-start gap-2 rounded-xl border border-destructive/25 bg-destructive/[0.05] px-3 py-2 text-xs leading-5 text-destructive">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>{pickerErrorMessage}</span>
+        <DialogContent className="flex max-h-[88dvh] max-w-none flex-col gap-0 overflow-hidden rounded-t-[1.75rem] border-x-0 border-b-0 p-0 max-sm:left-0 max-sm:right-0 max-sm:top-auto max-sm:bottom-0 max-sm:w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:data-[state=closed]:![--tw-exit-scale:1] max-sm:data-[state=closed]:![--tw-exit-translate-x:0] max-sm:data-[state=closed]:![--tw-exit-translate-y:100%] max-sm:data-[state=open]:![--tw-enter-scale:1] max-sm:data-[state=open]:![--tw-enter-translate-x:0] max-sm:data-[state=open]:![--tw-enter-translate-y:100%] sm:max-w-md sm:rounded-2xl">
+          {createdMatch ? (
+            <>
+              <div aria-hidden="true" className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-muted-foreground/25 sm:hidden" />
+              <DialogHeader className="border-b px-5 pb-4 pt-5">
+                <DialogTitle>Nhóm H2H đã được tạo</DialogTitle>
+                <DialogDescription>GW {createdMatch.gameweek}</DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-1 flex-col items-center justify-center px-5 py-10 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="h-7 w-7" />
+                </div>
+                <p className="mt-4 text-lg font-bold">Sẵn sàng so điểm gameweek</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Nhóm của bạn có {createdMatch.participantCount} thành viên.
+                </p>
               </div>
-            )}
-            {selectedManagers.length > 0 && (
-              <div className="mb-3 flex flex-wrap gap-1.5 px-1">
-                {selectedManagers.map((manager) => (
-                  <button
-                    key={manager.entryId}
-                    type="button"
-                    onClick={() => toggleManager(manager.entryId)}
-                    className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"
-                  >
-                    {manager.managerName}
-                    <X className="h-3 w-3" />
-                  </button>
-                ))}
-              </div>
-            )}
+              <DialogFooter className="border-t bg-background px-4 py-3 sm:flex-row sm:justify-end">
+                <Button
+                  className="w-full rounded-xl sm:w-auto"
+                  onClick={() => {
+                    setMatchFilter("mine");
+                    setIsPickerOpen(false);
+                    setCreatedMatch(null);
+                    window.requestAnimationFrame(() => {
+                      matchesSectionRef.current?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "start",
+                      });
+                    });
+                  }}
+                >
+                  Xem trận của tôi
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <div aria-hidden="true" className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-muted-foreground/25 sm:hidden" />
+              <DialogHeader className="border-b px-5 pb-4 pt-5">
+                <DialogTitle>Chọn đối thủ</DialogTitle>
+                <DialogDescription>
+                  GW {matchesData?.gameweek.creationGameweek ?? "—"}
+                </DialogDescription>
+              </DialogHeader>
 
-            <div className="space-y-1.5">
-              {data.managers
-                .filter((manager) => !manager.claimedByMe)
-                .map((manager) => {
-                  const selected = selectedEntryIds.includes(manager.entryId);
-                  const unavailable = !manager.claimed;
+              <div className="min-h-0 flex-1 overflow-y-auto p-3">
+                <div className="space-y-1.5">
+                  {readyOpponents.map((manager) => {
+                    const selected = selectedEntryIds.includes(manager.entryId);
 
-                  return (
-                    <button
-                      key={manager.entryId}
-                      type="button"
-                      disabled={unavailable}
-                      onClick={() => toggleManager(manager.entryId)}
-                      className={cn(
-                        "flex w-full items-center gap-3 rounded-xl border p-2.5 text-left",
-                        selected
-                          ? "border-primary bg-primary/[0.06]"
-                          : "border-transparent bg-muted/50",
-                        unavailable && "cursor-not-allowed opacity-45",
-                      )}
-                    >
-                      <Avatar manager={manager} size="sm" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold">{manager.managerName}</p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {manager.teamName}
-                        </p>
-                      </div>
-                      {unavailable ? (
-                        <span className="text-[10px] text-muted-foreground">Chưa claim</span>
-                      ) : selected ? (
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                          <Check className="h-3.5 w-3.5" />
+                    return (
+                      <button
+                        key={manager.entryId}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => toggleManager(manager.entryId)}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-xl border p-2.5 text-left transition-colors",
+                          selected
+                            ? "border-primary bg-primary/[0.06]"
+                            : "border-transparent bg-muted/50 hover:bg-muted",
+                        )}
+                      >
+                        <Avatar manager={manager} size="sm" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold">{manager.managerName}</p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {manager.teamName}
+                          </p>
+                        </div>
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors",
+                            selected
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-muted-foreground/45",
+                          )}
+                        >
+                          {selected && <Check className="h-3.5 w-3.5" />}
                         </span>
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      )}
-                    </button>
-                  );
-                })}
-            </div>
-          </div>
+                      </button>
+                    );
+                  })}
+                  {readyOpponents.length === 0 && (
+                    <p className="rounded-xl border border-dashed p-3 text-xs text-muted-foreground">
+                      Hiện chưa có manager nào có thể chọn.
+                    </p>
+                  )}
+                </div>
+              </div>
 
-          <DialogFooter className="border-t bg-background px-4 py-3 sm:flex-row sm:justify-between">
-            <p className="hidden text-xs text-muted-foreground sm:block">
-              Nhóm có {selectedEntryIds.length + 1} người
-            </p>
-            <Button
-              className="w-full rounded-xl sm:w-auto"
-              disabled={selectedEntryIds.length === 0 || isCreating}
-              onClick={createMatch}
-            >
-              {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isCreating
-                ? "Đang tạo..."
-                : `Tạo nhóm${selectedEntryIds.length ? ` (${selectedEntryIds.length + 1})` : ""}`}
-            </Button>
-          </DialogFooter>
+              <DialogFooter className="flex-col gap-2 border-t bg-background px-4 py-3 sm:flex-row sm:justify-between">
+                {pickerErrorMessage && (
+                  <p role="alert" className="flex items-start gap-2 text-left text-xs leading-5 text-destructive">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    {pickerErrorMessage}
+                  </p>
+                )}
+                <Button
+                  className="w-full rounded-xl sm:w-auto"
+                  disabled={selectedEntryIds.length === 0 || isCreating}
+                  onClick={createMatch}
+                >
+                  {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isCreating
+                    ? "Đang tạo..."
+                    : `Tạo nhóm ${selectedEntryIds.length + 1} người`}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 

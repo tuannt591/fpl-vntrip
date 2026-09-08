@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
+  LockKeyhole,
   Loader2,
   ShieldCheck,
   UserCheck,
@@ -44,6 +45,7 @@ import type {
 } from "@/types/h2h";
 
 type ViewState = "loading" | "anonymous" | "ready" | "error";
+type ManagerFilter = "all" | "available" | "claimed";
 
 function normalizeManagerOptions(responseData: ManagerOptionsResponse) {
   const myManager = responseData.myManager;
@@ -94,6 +96,8 @@ export function H2HPanel() {
   const [claimDialogOpen, setClaimDialogOpen] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [managerFilter, setManagerFilter] = useState<ManagerFilter>("all");
+  const [managerNotice, setManagerNotice] = useState("");
 
   const loadManagerData = useCallback(async (force = false) => {
     const cached = getCachedManagerOptions();
@@ -128,8 +132,19 @@ export function H2HPanel() {
     }
   }, [router, viewState]);
 
+  useEffect(() => {
+    if (!managerNotice) return;
+
+    const timeoutId = window.setTimeout(() => setManagerNotice(""), 3_500);
+    return () => window.clearTimeout(timeoutId);
+  }, [managerNotice]);
+
   const selectedManager =
     data?.managers.find((manager) => manager.entryId === selectedEntryId) ?? null;
+  const availableManagers =
+    data?.managers.filter((manager) => !manager.claimed || manager.claimedByMe) ?? [];
+  const claimedManagers =
+    data?.managers.filter((manager) => manager.claimed && !manager.claimedByMe) ?? [];
 
   const claimManager = async () => {
     if (!selectedManager || isClaiming) return;
@@ -157,6 +172,11 @@ export function H2HPanel() {
       if (!response.ok || !responseData.manager) {
         throw new Error(responseData.error || "Không thể claim manager.");
       }
+
+      window.sessionStorage.setItem(
+        "fpl-vntrip:h2h-claim-success",
+        responseData.manager.teamName,
+      );
 
       setData((current) =>
         current
@@ -227,60 +247,160 @@ export function H2HPanel() {
 
   return (
     <div className="w-full space-y-5">
-      <div className="rounded-3xl border bg-gradient-to-br from-primary/[0.09] to-transparent p-6 sm:p-8">
-        <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-            <ShieldCheck className="h-6 w-6" />
+      <div className="rounded-2xl border bg-primary/[0.06] px-3 py-2.5 sm:px-4 sm:py-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+            <ShieldCheck className="h-4 w-4" />
           </div>
-          <div>
-            <h1 className="text-2xl font-black tracking-tight">
-              Xác nhận manager của bạn
-            </h1>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-              Mỗi tài khoản chỉ claim một manager trong mùa {data.season}. Hãy
-              chọn đúng trước khi bước vào H2H Arena.
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">
+              Bước 1 / 2 · H2H Arena
             </p>
+            <h1 className="truncate text-base font-bold tracking-tight sm:text-lg">
+              Xác nhận đội đại diện của bạn
+            </h1>
           </div>
+          <span className="hidden rounded-full bg-background/80 px-2.5 py-1 text-xs font-medium text-muted-foreground sm:inline">
+            Mùa {data.season}
+          </span>
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        {data.managers.map((manager) => {
-          const selected = selectedEntryId === manager.entryId;
-          const unavailable = manager.claimed && !manager.claimedByMe;
+      <section aria-labelledby="manager-list-title" className="space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 id="manager-list-title" className="font-bold">Chọn đội FPL</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {availableManagers.length} khả dụng · {claimedManagers.length} đã được claim
+            </p>
+          </div>
+          <div className="flex rounded-xl bg-muted p-1" role="tablist" aria-label="Lọc manager">
+            {(
+              [
+                ["all", "Tất cả"],
+                ["available", "Khả dụng"],
+                ["claimed", "Đã claim"],
+              ] as const
+            ).map(([filter, label]) => (
+              <button
+                key={filter}
+                type="button"
+                role="tab"
+                aria-selected={managerFilter === filter}
+                onClick={() => setManagerFilter(filter)}
+                className={cn(
+                  "rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  managerFilter === filter
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
 
-          return (
-            <button
-              key={manager.entryId}
-              type="button"
-              disabled={unavailable}
-              onClick={() => setSelectedEntryId(manager.entryId)}
-              className={cn(
-                "flex items-center gap-3 rounded-2xl border bg-card p-4 text-left transition",
-                selected
-                  ? "border-primary bg-primary/[0.055] ring-2 ring-primary/10"
-                  : "hover:border-primary/35 hover:shadow-sm",
-                unavailable && "cursor-not-allowed opacity-40",
-              )}
-            >
-              <ManagerAvatar manager={manager} />
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold">{manager.teamName}</p>
-                <p className="truncate text-sm text-muted-foreground">
-                  {manager.managerName}
-                </p>
+        {(managerFilter === "all" || managerFilter === "available") && (
+          <div className="space-y-3">
+            {managerFilter === "all" && (
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                Khả dụng ({availableManagers.length})
+              </p>
+            )}
+            {availableManagers.length > 0 ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {availableManagers.map((manager) => {
+                  const selected = selectedEntryId === manager.entryId;
+
+                  return (
+                    <button
+                      key={manager.entryId}
+                      type="button"
+                      onClick={() => {
+                        setSelectedEntryId(manager.entryId);
+                        setManagerNotice("");
+                      }}
+                      className={cn(
+                        "flex items-center gap-3 rounded-2xl border bg-card p-4 text-left transition",
+                        selected
+                          ? "border-primary bg-primary/[0.055] ring-2 ring-primary/10"
+                          : "hover:border-primary/35 hover:shadow-sm",
+                      )}
+                    >
+                      <ManagerAvatar manager={manager} />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-semibold">{manager.teamName}</p>
+                        <p className="truncate text-sm text-muted-foreground">
+                          {manager.managerName}
+                        </p>
+                      </div>
+                      {selected ? (
+                        <UserCheck className="h-5 w-5 text-primary" aria-label="Đã chọn" />
+                      ) : (
+                        <span className="h-5 w-5 rounded-full border-2" aria-hidden="true" />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
-              {unavailable ? (
-                <span className="text-[11px] text-muted-foreground">Đã claim</span>
-              ) : selected ? (
-                <UserCheck className="h-5 w-5 text-primary" />
-              ) : (
-                <span className="h-5 w-5 rounded-full border-2" />
-              )}
-            </button>
-          );
-        })}
-      </div>
+            ) : (
+              <p className="rounded-2xl border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
+                Hiện không còn manager khả dụng để claim.
+              </p>
+            )}
+          </div>
+        )}
+
+        {(managerFilter === "all" || managerFilter === "claimed") && (
+          <div className="space-y-3">
+            {managerFilter === "all" && (
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                Đã được claim ({claimedManagers.length})
+              </p>
+            )}
+            {claimedManagers.length > 0 ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {claimedManagers.map((manager) => (
+                  <button
+                    key={manager.entryId}
+                    type="button"
+                    aria-disabled="true"
+                    onClick={() => setManagerNotice("Manager này đã được một tài khoản khác xác nhận.")}
+                    className="flex items-center gap-3 rounded-2xl border border-border/80 bg-muted/35 p-4 text-left transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <ManagerAvatar manager={manager} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold">{manager.teamName}</p>
+                      <p className="truncate text-sm text-muted-foreground">
+                        {manager.managerName}
+                      </p>
+                    </div>
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-background px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+                      <LockKeyhole className="h-3 w-3" aria-hidden="true" />
+                      Đã claim
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : managerFilter === "claimed" ? (
+              <p className="rounded-2xl border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
+                Chưa có manager nào được claim.
+              </p>
+            ) : null}
+          </div>
+        )}
+      </section>
+
+      {managerNotice && (
+        <div
+          role="status"
+          className="pointer-events-none fixed inset-x-3 bottom-[calc(8.5rem+env(safe-area-inset-bottom))] z-50 mx-auto flex max-w-md items-start gap-2 rounded-xl border border-amber-500/30 bg-background/95 p-3 text-sm text-amber-800 shadow-xl backdrop-blur animate-in fade-in slide-in-from-bottom-2 dark:text-amber-300 md:bottom-5"
+        >
+          <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0" />
+          {managerNotice}
+        </div>
+      )}
 
       {errorMessage && (
         <p className="flex items-start gap-2 text-sm text-destructive">
@@ -295,8 +415,8 @@ export function H2HPanel() {
           onClick={() => selectedManager && setClaimDialogOpen(true)}
         >
           {selectedManager
-            ? `Claim ${selectedManager.teamName}`
-            : "Chọn manager để tiếp tục"}
+            ? `Tiếp tục với ${selectedManager.teamName}`
+            : "Chọn một manager để tiếp tục"}
         </Button>
       </div>
 
