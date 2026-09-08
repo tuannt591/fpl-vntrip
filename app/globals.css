@@ -746,7 +746,7 @@ html {
   background: hsl(var(--muted-foreground) / 0.3);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 767px) {
   .fpl-ermis-chat .ermis-channel-header {
     padding-inline: 1rem;
   }
@@ -772,7 +772,7 @@ html {
   }
 
   .fpl-ermis-chat .ermis-message-input {
-    padding-inline: 0.75rem;
+    padding: 0.5rem 0.75rem max(0.5rem, env(safe-area-inset-bottom));
   }
 
   .fpl-ermis-chat .ermis-message-input__editable {
@@ -783,4 +783,14 @@ html {
 html, body {
   height: 100%;
   min-height: 100%;
+}
+
+@keyframes navigation-progress {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(350%);
+  }
 }

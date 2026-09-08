@@ -1,6 +1,7 @@
 import { Paperclip, Send } from "lucide-react";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { MobileChatNavigation } from "@/components/chat/chat-mobile-navigation";
 
 const messageSkeletons = [
   { side: "left", width: "w-52 sm:w-72" },
@@ -13,14 +14,15 @@ export function ChatLoading() {
     <section
       role="status"
       aria-label="Đang đồng bộ cuộc trò chuyện"
-      className="relative mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col overflow-hidden bg-card sm:rounded-3xl sm:border sm:shadow-[0_24px_70px_-35px_rgba(15,23,42,0.35)] sm:dark:shadow-[0_24px_70px_-35px_rgba(0,0,0,0.8)]"
+      className="relative mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col overflow-hidden bg-card md:rounded-3xl md:border md:shadow-[0_24px_70px_-35px_rgba(15,23,42,0.35)] md:dark:shadow-[0_24px_70px_-35px_rgba(0,0,0,0.8)]"
     >
       <div className="absolute inset-x-0 top-0 h-0.5 overflow-hidden bg-primary/10">
         <div className="h-full w-1/2 animate-pulse rounded-full bg-primary" />
       </div>
 
-      <header className="flex h-[64px] shrink-0 items-center gap-2 border-b px-2.5 sm:h-[76px] sm:gap-3 sm:px-5">
-        <Skeleton className="h-9 w-9 shrink-0 rounded-full sm:h-10 sm:w-10" />
+      <header className="flex h-14 shrink-0 items-center gap-2 border-b px-2.5 md:h-[76px] md:gap-3 md:px-5">
+        <MobileChatNavigation />
+        <Skeleton className="h-8 w-8 shrink-0 rounded-full md:h-10 md:w-10" />
         <div className="min-w-0 flex-1 space-y-2">
           <Skeleton className="h-3.5 w-36 rounded-full" />
           <Skeleton className="h-2.5 w-24 rounded-full" />
@@ -61,7 +63,7 @@ export function ChatLoading() {
         </div>
       </div>
 
-      <footer className="flex min-h-[76px] shrink-0 items-center gap-3 border-t bg-background px-4 sm:px-6">
+      <footer className="flex min-h-[76px] shrink-0 items-center gap-3 border-t bg-background px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 md:px-6 md:py-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground/40">
           <Paperclip className="h-5 w-5" />
         </div>

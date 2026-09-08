@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { MessageCircle, Swords, Trophy } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef } from "react";
 
+import { useNavigationFeedback } from "@/components/layout/navigation-feedback";
+import { useTabNavigation } from "@/components/layout/use-tab-navigation";
 import { cn } from "@/lib/utils";
 
 const navigationItems = [
@@ -21,13 +23,12 @@ export function MobileTabNav() {
   const pathname = usePathname();
   const router = useRouter();
   const prefetchedRoutes = useRef(new Set<string>());
-  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const { pendingHref } = useNavigationFeedback();
+  const handleTabNavigation = useTabNavigation();
   const selectedHref = pendingHref ?? pathname;
   const selectedIndex = navigationItems.findIndex(({ href }) =>
     isActivePath(selectedHref, href),
   );
-
-  useEffect(() => setPendingHref(null), [pathname]);
 
   const prefetchRoute = useCallback(
     (href: string) => {
@@ -65,9 +66,7 @@ export function MobileTabNav() {
                 scroll={false}
                 aria-busy={pending || undefined}
                 aria-current={active ? "page" : undefined}
-                onClick={() => {
-                  if (!active) setPendingHref(href);
-                }}
+                onClick={(event) => handleTabNavigation(event, href, active)}
                 onFocus={() => prefetchRoute(href)}
                 onPointerEnter={() => prefetchRoute(href)}
                 onTouchStart={() => prefetchRoute(href)}
