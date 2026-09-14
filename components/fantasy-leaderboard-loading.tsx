@@ -4,10 +4,9 @@ import { primaryPageContainerClassName } from "@/lib/page-layout";
 
 const managerRows = [0, 1, 2, 3, 4, 5, 6] as const;
 
-export function FantasyLeaderboardContentSkeleton() {
+function TeamsContentSkeleton() {
   return (
-    <div aria-busy="true" aria-live="polite" className="space-y-6">
-      <span className="sr-only">Đang tải bảng xếp hạng</span>
+    <>
       <section className="overflow-hidden rounded-3xl border bg-card shadow-sm">
         <div className="flex items-center justify-between border-b bg-muted/35 px-3 py-2">
           <Skeleton className="h-3 w-32" />
@@ -58,6 +57,64 @@ export function FantasyLeaderboardContentSkeleton() {
           ))}
         </div>
       </section>
+    </>
+  );
+}
+
+function ManagersContentSkeleton() {
+  return (
+    <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+      <div className="flex items-center justify-between gap-3 border-b bg-muted/25 px-3 py-3 sm:px-4">
+        <div className="flex items-center gap-2.5">
+          <Skeleton className="h-8 w-8 rounded-xl" />
+          <div className="space-y-1.5">
+            <Skeleton className="h-4 w-36" />
+            <Skeleton className="h-3 w-28" />
+          </div>
+        </div>
+        <Skeleton className="h-6 w-11 rounded-lg" />
+      </div>
+
+      <div role="table" aria-label="Đang tải bảng xếp hạng manager">
+        <div className="grid grid-cols-[34px_minmax(0,1fr)_56px_44px] items-center gap-2 border-b bg-muted/20 px-3 py-2 sm:grid-cols-[42px_minmax(0,1fr)_76px_64px] sm:px-4">
+          <Skeleton className="h-3 w-7" />
+          <Skeleton className="h-3 w-14" />
+          <Skeleton className="justify-self-end h-3 w-9" />
+          <Skeleton className="justify-self-end h-3 w-6" />
+        </div>
+        <div className="divide-y">
+          {managerRows.map((index) => (
+            <div
+              key={index}
+              className="grid min-h-[61px] grid-cols-[34px_minmax(0,1fr)_56px_44px] items-center gap-2 px-3 py-2.5 sm:grid-cols-[42px_minmax(0,1fr)_76px_64px] sm:px-4"
+            >
+              <Skeleton className="h-7 w-7 rounded-lg sm:h-8 sm:w-8" />
+              <div className="flex min-w-0 items-center gap-2">
+                <Skeleton className="h-7 w-7 shrink-0 rounded-full sm:h-8 sm:w-8" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Skeleton className="h-3 w-24 max-w-full" />
+                  <Skeleton className="h-2.5 w-16 max-w-[80%]" />
+                </div>
+              </div>
+              <Skeleton className="justify-self-end h-4 w-10" />
+              <Skeleton className="justify-self-end h-3 w-7" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function FantasyLeaderboardContentSkeleton({
+  activeTab = "teams",
+}: {
+  activeTab?: "teams" | "managers";
+}) {
+  return (
+    <div aria-busy="true" aria-live="polite" className="space-y-6">
+      <span className="sr-only">Đang tải bảng xếp hạng</span>
+      {activeTab === "managers" ? <ManagersContentSkeleton /> : <TeamsContentSkeleton />}
     </div>
   );
 }

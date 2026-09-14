@@ -590,11 +590,11 @@ export const FantasyLeaderboard = () => {
           <div
             role="tablist"
             aria-label="Chế độ bảng xếp hạng"
-            className="relative mb-4 grid grid-cols-2 rounded-xl bg-muted p-1 text-sm font-semibold"
+            className="relative mb-4 grid grid-cols-2 rounded-xl border border-primary/20 bg-primary/[0.08] p-1 text-sm font-semibold"
           >
             <span
               aria-hidden
-              className="pointer-events-none absolute bottom-1 left-1 top-1 rounded-lg bg-background shadow-sm transition-transform duration-300 ease-out motion-reduce:transition-none"
+              className="pointer-events-none absolute bottom-1 left-1 top-1 rounded-lg bg-primary shadow-sm shadow-primary/20 transition-transform duration-300 ease-out motion-reduce:transition-none"
               style={{
                 width: "calc((100% - 0.5rem) / 2)",
                 transform: `translateX(${activeTab === "managers" ? 100 : 0}%)`,
@@ -611,8 +611,8 @@ export const FantasyLeaderboard = () => {
                 aria-selected={activeTab === tab}
                 onClick={() => selectHomeTab(tab)}
                 className={`relative z-10 h-9 rounded-lg transition-colors duration-200 motion-reduce:transition-none ${activeTab === tab
-                  ? "text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "text-primary-foreground"
+                  : "text-primary/65 hover:text-primary"
                   }`}
               >
                 {label}
@@ -620,7 +620,7 @@ export const FantasyLeaderboard = () => {
             ))}
           </div>
           {isLoading ? (
-            <FantasyLeaderboardContentSkeleton />
+            <FantasyLeaderboardContentSkeleton activeTab={activeTab} />
           ) : (
             <>
               {error && (
@@ -643,7 +643,7 @@ export const FantasyLeaderboard = () => {
                           size="sm"
                           variant="outline"
                           onClick={() => setIsScenarioOpen(true)}
-                          className="h-7 rounded-lg px-2 text-[10px] font-bold sm:px-2.5 sm:text-xs"
+                          className="h-7 rounded-lg border-sky-600 bg-sky-600 px-2 text-[10px] font-bold text-white shadow-sm hover:border-sky-700 hover:bg-sky-700 hover:text-white dark:border-sky-500 dark:bg-sky-500 dark:hover:border-sky-400 dark:hover:bg-sky-400 sm:px-2.5 sm:text-xs"
                         >
                           Phân tích
                         </Button>
