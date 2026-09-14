@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight, RefreshCw, Search, Trophy } from "lucide-rea
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ManagerAccordionList } from './ui/manager-accordion-list';
+import { ManagerLeagueLeaderboard } from './manager-league-leaderboard';
 import { Button } from './ui/button';
 import {
   FantasyLeaderboardContentSkeleton,
@@ -26,6 +27,7 @@ import {
 } from "@/lib/tab-data";
 
 type TeamFilter = "all" | "Vinno" | "Americano";
+type HomeTab = "teams" | "managers";
 
 const TEAM_FILTERS: ReadonlyArray<readonly [TeamFilter, string]> = [
   ["all", "Tất cả"],
@@ -348,6 +350,9 @@ export const FantasyLeaderboard = () => {
   const [selectedTeamDialog, setSelectedTeamDialog] = useState<string | null>(null);
   const [expandedTeamWeek, setExpandedTeamWeek] = useState<number | null>(null);
   const [isScenarioOpen, setIsScenarioOpen] = useState(false);
+  const [selectedScenarioTeam, setSelectedScenarioTeam] = useState<string | null>(null);
+  const [showAllScenarioPlayers, setShowAllScenarioPlayers] = useState(false);
+  const [activeTab, setActiveTab] = useState<HomeTab>("teams");
   const [teamFilter, setTeamFilter] = useState<TeamFilter>("all");
   const [managerQuery, setManagerQuery] = useState("");
   const [hasLoadedData, setHasLoadedData] = useState(() => Boolean(initialData));
@@ -357,6 +362,15 @@ export const FantasyLeaderboard = () => {
     forceReloadRef.current = true;
     setReloadKey(prev => prev + 1);
     setSelectedGW(0);
+  };
+
+  const selectHomeTab = (tab: HomeTab) => {
+    setActiveTab(tab);
+    if (tab === "managers") {
+      setSelectedGW(0);
+      setSelectedTeamDialog(null);
+      setIsScenarioOpen(false);
+    }
   };
 
   useEffect(() => {
@@ -476,6 +490,24 @@ export const FantasyLeaderboard = () => {
     () => (hasRemainingFixture ? runComebackSimulation(teamLiveScenarios) : null),
     [hasRemainingFixture, teamLiveScenarios],
   );
+  const activeScenarioTeam =
+    teamLiveScenarios.find((team) => team.name === selectedScenarioTeam) ??
+    teamLiveScenarios[0] ??
+    null;
+  const activeScenarioTeamIndex = Math.max(
+    0,
+    teamLiveScenarios.findIndex((team) => team.name === activeScenarioTeam?.name),
+  );
+  const visibleScenarioPlayers = activeScenarioTeam
+    ? (showAllScenarioPlayers
+      ? activeScenarioTeam.players
+      : activeScenarioTeam.players.slice(0, 4))
+    : [];
+  const closeScenario = () => {
+    setIsScenarioOpen(false);
+    setSelectedScenarioTeam(null);
+    setShowAllScenarioPlayers(false);
+  };
 
   if (isLoading && !hasLoadedData) {
     return <FantasyLeaderboardLoadingSkeleton />;
@@ -514,25 +546,31 @@ export const FantasyLeaderboard = () => {
             </div>
 
             <div className="flex items-center gap-2">
-              <label className="inline-flex h-9 items-center gap-1.5 rounded-xl border bg-background px-2.5 text-xs font-semibold shadow-sm">
-                <span className="text-muted-foreground">GW</span>
-                {isLoading ? (
-                  <span className="inline-block h-4 w-8 animate-pulse rounded bg-muted" />
-                ) : (
-                  <select
-                    aria-label="Chọn Gameweek"
-                    value={selectedGW || currentGW}
-                    onChange={(event) => setSelectedGW(Number(event.target.value))}
-                    className="min-w-11 bg-transparent font-mono text-sm font-bold outline-none"
-                  >
-                    {Array.from({ length: currentGW }, (_, index) => currentGW - index).map((gw) => (
-                      <option key={gw} value={gw}>
-                        {gw}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </label>
+              {activeTab === "teams" ? (
+                <label className="inline-flex h-9 items-center gap-1.5 rounded-xl border bg-background px-2.5 text-xs font-semibold shadow-sm">
+                  <span className="text-muted-foreground">GW</span>
+                  {isLoading ? (
+                    <span className="inline-block h-4 w-8 animate-pulse rounded bg-muted" />
+                  ) : (
+                    <select
+                      aria-label="Chọn Gameweek"
+                      value={selectedGW || currentGW}
+                      onChange={(event) => setSelectedGW(Number(event.target.value))}
+                      className="min-w-11 bg-transparent font-mono text-sm font-bold outline-none"
+                    >
+                      {Array.from({ length: currentGW }, (_, index) => currentGW - index).map((gw) => (
+                        <option key={gw} value={gw}>
+                          {gw}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </label>
+              ) : (
+                <span className="inline-flex h-9 items-center rounded-xl border bg-background px-2.5 font-mono text-sm font-bold shadow-sm">
+                  GW {currentGW || "—"}
+                </span>
+              )}
               <button
                 onClick={reloadData}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-xl border bg-background text-muted-foreground shadow-sm transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
@@ -548,6 +586,38 @@ export const FantasyLeaderboard = () => {
         </CardHeader>
 
         <CardContent className="px-0">
+          <div
+            role="tablist"
+            aria-label="Chế độ bảng xếp hạng"
+            className="relative mb-4 grid grid-cols-2 rounded-xl bg-muted p-1 text-sm font-semibold"
+          >
+            <span
+              aria-hidden
+              className="pointer-events-none absolute bottom-1 left-1 top-1 rounded-lg bg-background shadow-sm transition-transform duration-300 ease-out motion-reduce:transition-none"
+              style={{
+                width: "calc((100% - 0.5rem) / 2)",
+                transform: `translateX(${activeTab === "managers" ? 100 : 0}%)`,
+              }}
+            />
+            {([
+              ["teams", "Teams"],
+              ["managers", "Managers"],
+            ] as const).map(([tab, label]) => (
+              <button
+                key={tab}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab}
+                onClick={() => selectHomeTab(tab)}
+                className={`relative z-10 h-9 rounded-lg transition-colors duration-200 motion-reduce:transition-none ${activeTab === tab
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+                  }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           {isLoading ? (
             <FantasyLeaderboardContentSkeleton />
           ) : (
@@ -561,7 +631,7 @@ export const FantasyLeaderboard = () => {
                 </div>
               )}
 
-              {teamStats.length > 0 && currentLeagueId === VNTRIP_LEAGUE_ID && (
+              {activeTab === "teams" && teamStats.length > 0 && currentLeagueId === VNTRIP_LEAGUE_ID && (
                 <section className="mb-5 overflow-hidden rounded-3xl border bg-card shadow-[0_16px_34px_-30px_hsl(var(--foreground)/0.45)]">
                   <div className="flex items-center justify-between gap-2 border-b bg-muted/35 px-3 py-2 text-xs sm:px-4">
                     <span className="font-semibold text-muted-foreground">Matchday scoreboard</span>
@@ -658,7 +728,8 @@ export const FantasyLeaderboard = () => {
                 </section>
               )}
 
-              <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+              {activeTab === "teams" ? (
+                <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                 <div className="flex flex-col gap-2 border-b bg-muted/25 p-2 sm:flex-row sm:items-center sm:justify-between sm:px-3">
                   <div
                     role="tablist"
@@ -709,104 +780,181 @@ export const FantasyLeaderboard = () => {
                     <ManagerAccordionList managers={filteredLeaderboardData} />
                   )}
                 </div>
-              </section>
+                </section>
+              ) : (
+                <ManagerLeagueLeaderboard
+                  managers={leaderboardData}
+                  currentGameweek={currentGW}
+                />
+              )}
             </>
           )}
         </CardContent>
       </Card>
 
-      <Dialog open={isScenarioOpen} onOpenChange={setIsScenarioOpen}>
+      <Dialog
+        open={isScenarioOpen}
+        onOpenChange={(open) => {
+          if (open) {
+            setIsScenarioOpen(true);
+            return;
+          }
+          closeScenario();
+        }}
+      >
         <DialogContent
+          bottomSheet
           overlayClassName="!bg-black/35 backdrop-blur-sm"
-          onMobileSwipeDown={() => setIsScenarioOpen(false)}
-          className="bottom-0 left-0 right-0 top-auto max-h-[85dvh] max-w-none translate-x-0 translate-y-0 gap-3 overflow-y-auto rounded-t-3xl border-x-0 border-b-0 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] max-sm:data-[state=closed]:![--tw-exit-scale:1] max-sm:data-[state=closed]:![--tw-exit-translate-x:0] max-sm:data-[state=closed]:![--tw-exit-translate-y:100%] max-sm:data-[state=open]:![--tw-enter-scale:1] max-sm:data-[state=open]:![--tw-enter-translate-x:0] max-sm:data-[state=open]:![--tw-enter-translate-y:100%] sm:left-1/2 sm:top-1/2 sm:max-w-2xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border sm:p-6"
+          onMobileSwipeDown={closeScenario}
+          className="max-h-[78dvh] rounded-t-3xl border-x-0 border-b-0 max-sm:data-[state=closed]:![--tw-exit-scale:1] max-sm:data-[state=closed]:![--tw-exit-translate-x:0] max-sm:data-[state=closed]:![--tw-exit-translate-y:100%] max-sm:data-[state=open]:![--tw-enter-scale:1] max-sm:data-[state=open]:![--tw-enter-translate-x:0] max-sm:data-[state=open]:![--tw-enter-translate-y:100%] sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2 sm:max-h-[85dvh] sm:max-w-2xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border"
         >
-          <div
-            aria-hidden="true"
-            data-bottom-sheet-drag-handle
-            className="flex h-10 w-full touch-none items-center justify-center sm:hidden"
-          >
-            <span className="bottom-sheet-drag-indicator" />
+          <div className="shrink-0 border-b bg-background/95 px-4 pb-3 pt-0 backdrop-blur sm:px-6 sm:pb-4 sm:pt-5">
+            <div
+              aria-hidden="true"
+              data-bottom-sheet-drag-handle
+              className="flex h-8 w-full touch-none items-center justify-center sm:hidden"
+            >
+              <span className="bottom-sheet-drag-indicator" />
+            </div>
+            <DialogHeader className="pr-9 text-left">
+              <DialogTitle>Cầu thủ còn lại & xác suất</DialogTitle>
+              <DialogDescription>
+                GW {selectedGameweek} · Chỉ tính các cầu thủ còn fixture chưa bắt đầu.
+              </DialogDescription>
+            </DialogHeader>
           </div>
-          <DialogHeader className="pr-8 text-left">
-            <DialogTitle>Cầu thủ còn lại & xác suất</DialogTitle>
-            <DialogDescription>
-              GW {selectedGameweek} · Dựa trên các cầu thủ còn fixture chưa bắt đầu.
-            </DialogDescription>
-          </DialogHeader>
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:py-4">
+            {comebackAnalysis && (
+              <section className="rounded-2xl border border-primary/20 bg-primary/[0.035] p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-black">Xác suất thắng GW</h3>
+                  <span className="rounded-full bg-background px-2 py-1 text-[10px] font-semibold text-muted-foreground">
+                    Ước tính
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+                  {teamLiveScenarios.slice(0, 2).flatMap((team, index) => {
+                    const teamSummary = (
+                      <div key={team.name} className={index === 1 ? "min-w-0 text-right" : "min-w-0"}>
+                        <p className={`truncate text-xs font-black ${TEAM_COLORS[team.name]?.text ?? "text-foreground"}`}>
+                          {team.name}
+                        </p>
+                        <p className="mt-0.5 font-mono text-2xl font-black tracking-tight">
+                          {Math.round((comebackAnalysis.winChances[team.name] ?? 0) * 100)}%
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">thắng</p>
+                      </div>
+                    );
 
-          {comebackAnalysis && (
-            <section className="rounded-2xl border border-primary/20 bg-primary/[0.035] p-3">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-sm font-black">Xác suất thắng GW</h3>
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {teamLiveScenarios.map((team) => (
-                  <div key={team.name} className="rounded-xl border bg-background p-3 text-center">
-                    <p className={`truncate text-xs font-black ${TEAM_COLORS[team.name]?.text ?? "text-foreground"}`}>
-                      {team.name}
-                    </p>
-                    <p className="mt-1 font-mono text-3xl font-black">
-                      {Math.round((comebackAnalysis.winChances[team.name] ?? 0) * 100)}%
-                    </p>
-                    <p className="text-[10px] font-medium text-muted-foreground">thắng</p>
-                  </div>
-                ))}
-              </div>
-              {comebackAnalysis.drawChance > 0 && (
-                <p className="mt-2 text-center text-[10px] text-muted-foreground">
-                  Xác suất hòa: {Math.round(comebackAnalysis.drawChance * 100)}%
-                </p>
-              )}
-            </section>
-          )}
+                    return index === 1
+                      ? [
+                          <span key="draw-chance" className="rounded-full border bg-background px-2 py-1 text-center text-[10px] font-bold text-muted-foreground">
+                            {Math.round(comebackAnalysis.drawChance * 100)}% hòa
+                          </span>,
+                          teamSummary,
+                        ]
+                      : [teamSummary];
+                  })}
+                </div>
+              </section>
+            )}
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            {teamLiveScenarios.map((team) => (
-              <section key={team.name} className="rounded-2xl border bg-card p-3">
+            {teamLiveScenarios.length > 0 && (
+              <div
+                role="tablist"
+                aria-label="Chọn đội để xem cầu thủ còn lại"
+                className="relative grid grid-cols-2 rounded-xl bg-muted p-1"
+              >
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute bottom-1 left-1 top-1 w-[calc((100%_-_0.5rem)_/_2)] rounded-lg bg-background shadow-sm transition-transform duration-300 ease-out motion-reduce:transition-none"
+                  style={{ transform: `translateX(${activeScenarioTeamIndex * 100}%)` }}
+                />
+                {teamLiveScenarios.map((team) => {
+                  const isActive = activeScenarioTeam?.name === team.name;
+
+                  return (
+                    <button
+                      key={team.name}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      onClick={() => {
+                        setSelectedScenarioTeam(team.name);
+                        setShowAllScenarioPlayers(false);
+                      }}
+                      className={`relative z-10 min-w-0 rounded-lg px-3 py-2 text-xs font-black transition-colors duration-200 motion-reduce:transition-none ${isActive ? "" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      <span className={`truncate ${isActive ? TEAM_COLORS[team.name]?.text ?? "text-foreground" : ""}`}>
+                        {team.name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {activeScenarioTeam && (
+              <section className="rounded-2xl border bg-card p-3">
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className={`text-sm font-black ${TEAM_COLORS[team.name]?.text ?? "text-foreground"}`}>
-                      {team.name}
+                  <div className="min-w-0">
+                    <h3 className={`truncate text-sm font-black ${TEAM_COLORS[activeScenarioTeam.name]?.text ?? "text-foreground"}`}>
+                      {activeScenarioTeam.name}
                     </h3>
                     <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      {team.remainingScoringSlots} lượt chưa đá
+                      Cầu thủ còn fixture
                     </p>
                   </div>
+                  <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-[10px] font-bold text-muted-foreground">
+                    {activeScenarioTeam.remainingScoringSlots} lượt chưa đá
+                  </span>
                 </div>
 
-                {team.players.length > 0 ? (
-                  <ul className="mt-3 divide-y rounded-xl border bg-muted/20 px-3">
-                    {team.players.map((player) => (
-                      <li key={player.element} className="flex items-center justify-between gap-3 py-2">
-                        <div className="min-w-0">
-                          <p className="truncate text-xs font-bold">
-                            {player.name} <span className="font-mono text-muted-foreground">×{player.copies}</span>
-                            {player.captainCopies > 0 && (
-                              <span className="ml-1 text-amber-600 dark:text-amber-400">
-                                C{player.captainCopies > 1 ? ` ×${player.captainCopies}` : ""}
-                              </span>
-                            )}
-                          </p>
-                          {player.fixtures.length > 0 && (
-                            <p className="truncate text-[10px] text-muted-foreground">
-                              {player.fixtures.join(" · ")}
+                {activeScenarioTeam.players.length > 0 ? (
+                  <>
+                    <ul className="mt-3 divide-y rounded-xl border bg-muted/20 px-3">
+                      {visibleScenarioPlayers.map((player) => (
+                        <li key={player.element} className="flex items-center justify-between gap-3 py-2.5">
+                          <div className="min-w-0">
+                            <p className="truncate text-xs font-bold">
+                              {player.name} <span className="font-mono text-muted-foreground">×{player.copies}</span>
+                              {player.captainCopies > 0 && (
+                                <span className="ml-1 text-amber-600 dark:text-amber-400">
+                                  C{player.captainCopies > 1 ? ` ×${player.captainCopies}` : ""}
+                                </span>
+                              )}
                             </p>
-                          )}
-                        </div>
-                        <span className="shrink-0 rounded-full bg-background px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                          chưa đá
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                            {player.fixtures.length > 0 && (
+                              <p className="truncate text-[10px] text-muted-foreground">
+                                {player.fixtures.join(" · ")}
+                              </p>
+                            )}
+                          </div>
+                          <span className="shrink-0 rounded-full bg-background px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                            chưa đá
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    {activeScenarioTeam.players.length > 4 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllScenarioPlayers((showAll) => !showAll)}
+                        className="mt-2 w-full rounded-xl border bg-background px-3 py-2 text-xs font-bold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                      >
+                        {showAllScenarioPlayers
+                          ? "Thu gọn danh sách"
+                          : `Xem thêm ${activeScenarioTeam.players.length - 4} cầu thủ`}
+                      </button>
+                    )}
+                  </>
                 ) : (
                   <p className="mt-3 rounded-xl bg-muted/40 px-3 py-4 text-center text-xs text-muted-foreground">
                     Không còn suất tính điểm chưa đá.
                   </p>
                 )}
               </section>
-            ))}
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -822,12 +970,13 @@ export const FantasyLeaderboard = () => {
         }}
       >
         <DialogContent
+          bottomSheet
           overlayClassName="!bg-black/40 backdrop-blur-sm"
           onMobileSwipeDown={() => {
             setExpandedTeamWeek(null)
             setSelectedTeamDialog(null)
           }}
-          className="flex max-h-[88dvh] max-w-none flex-col gap-0 overflow-hidden rounded-t-[1.75rem] border-x-0 border-b-0 p-0 shadow-2xl max-sm:bottom-0 max-sm:left-0 max-sm:right-0 max-sm:top-auto max-sm:w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:data-[state=closed]:![--tw-exit-scale:1] max-sm:data-[state=closed]:![--tw-exit-translate-x:0] max-sm:data-[state=closed]:![--tw-exit-translate-y:100%] max-sm:data-[state=open]:![--tw-enter-scale:1] max-sm:data-[state=open]:![--tw-enter-translate-x:0] max-sm:data-[state=open]:![--tw-enter-translate-y:100%] [&>button]:right-4 [&>button]:top-4 [&>button]:z-10 [&>button]:rounded-full [&>button]:bg-background/85 [&>button]:p-1 [&>button]:shadow-sm sm:max-w-xl sm:rounded-3xl sm:border"
+          className="flex max-h-[88dvh] max-w-none flex-col gap-0 overflow-hidden rounded-t-[1.75rem] border-x-0 border-b-0 p-0 shadow-2xl max-sm:data-[state=closed]:![--tw-exit-scale:1] max-sm:data-[state=closed]:![--tw-exit-translate-x:0] max-sm:data-[state=closed]:![--tw-exit-translate-y:100%] max-sm:data-[state=open]:![--tw-enter-scale:1] max-sm:data-[state=open]:![--tw-enter-translate-x:0] max-sm:data-[state=open]:![--tw-enter-translate-y:100%] [&>button]:right-4 [&>button]:top-4 [&>button]:z-10 [&>button]:rounded-full [&>button]:bg-background/85 [&>button]:p-1 [&>button]:shadow-sm sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2 sm:max-w-xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl sm:border"
         >
           <div className="shrink-0 border-b bg-background/95 px-4 pb-3 pt-0 backdrop-blur sm:px-6 sm:pt-5">
             <div

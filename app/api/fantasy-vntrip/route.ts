@@ -890,10 +890,14 @@ export async function GET(request: NextRequest) {
         );
 
         return {
+          // Keep the official classic-league rank for the Managers tab. The
+          // legacy `rank` below is recalculated from live GW points for Teams.
+          leagueRank: entry.rank,
           rank: entry.rank,
           manager: entry.player_name,
           teamName: entry.entry_name,
           totalPoint: entry.total,
+          eventTotal: entry.event_total,
           entry: entryId,
           gwPoint,
           team,

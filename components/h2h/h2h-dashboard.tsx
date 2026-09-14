@@ -702,13 +702,14 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
         }}
       >
         <DialogContent
+          bottomSheet
           overlayClassName="!bg-black/35 backdrop-blur-sm"
           onMobileSwipeDown={() => {
             setIsPickerOpen(false)
             setPickerErrorMessage("")
             setCreatedMatch(null)
           }}
-          className="flex max-h-[88dvh] max-w-none flex-col gap-0 overflow-hidden rounded-t-[1.75rem] border-x-0 border-b-0 p-0 max-sm:left-0 max-sm:right-0 max-sm:top-auto max-sm:bottom-0 max-sm:w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:data-[state=closed]:![--tw-exit-scale:1] max-sm:data-[state=closed]:![--tw-exit-translate-x:0] max-sm:data-[state=closed]:![--tw-exit-translate-y:100%] max-sm:data-[state=open]:![--tw-enter-scale:1] max-sm:data-[state=open]:![--tw-enter-translate-x:0] max-sm:data-[state=open]:![--tw-enter-translate-y:100%] sm:max-w-md sm:rounded-2xl"
+          className="flex max-h-[88dvh] max-w-none flex-col gap-0 overflow-hidden rounded-t-[1.75rem] border-x-0 border-b-0 p-0 max-sm:data-[state=closed]:![--tw-exit-scale:1] max-sm:data-[state=closed]:![--tw-exit-translate-x:0] max-sm:data-[state=closed]:![--tw-exit-translate-y:100%] max-sm:data-[state=open]:![--tw-enter-scale:1] max-sm:data-[state=open]:![--tw-enter-translate-x:0] max-sm:data-[state=open]:![--tw-enter-translate-y:100%] sm:bottom-auto sm:left-1/2 sm:right-auto sm:top-1/2 sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl"
         >
           {createdMatch ? (
             <>

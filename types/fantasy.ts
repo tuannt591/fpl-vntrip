@@ -81,10 +81,14 @@ export type Transfer = {
 };
 
 export type LeaderboardEntry = {
+  // Weekly rank is retained for the existing Teams experience.
   rank: number;
+  // Official FPL rank inside the classic league, ordered by total points.
+  leagueRank: number;
   manager: string;
   teamName: string;
   gwPoint: number;
+  eventTotal: number;
   totalPoint: number;
   entry: number;
   transfers: Transfer[];

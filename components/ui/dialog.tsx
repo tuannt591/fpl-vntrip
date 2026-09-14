@@ -32,6 +32,11 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 type DialogContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
   overlayClassName?: string
   onMobileSwipeDown?: () => void
+  /**
+   * Uses bottom-sheet positioning as the base style. This avoids the desktop
+   * dialog translate transforms leaking into sheets on small screens.
+   */
+  bottomSheet?: boolean
 }
 
 const DialogContent = React.forwardRef<
@@ -41,6 +46,7 @@ const DialogContent = React.forwardRef<
   children,
   overlayClassName,
   onMobileSwipeDown,
+  bottomSheet = false,
   style,
   onPointerDown,
   onPointerMove,
@@ -148,7 +154,9 @@ const DialogContent = React.forwardRef<
       <DialogPrimitive.Content
         ref={ref}
         className={cn(
-          "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg overflow-y-auto max-h-full",
+          bottomSheet
+            ? "fixed inset-x-0 bottom-0 z-50 flex w-full max-w-none flex-col translate-x-0 translate-y-0 overflow-hidden border bg-background p-0 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 sm:rounded-lg max-h-full"
+            : "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg overflow-y-auto max-h-full",
           className
         )}
         style={{ ...style, ...dragStyle }}

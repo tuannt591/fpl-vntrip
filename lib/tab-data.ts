@@ -9,6 +9,7 @@ import type {
 } from "@/types/h2h";
 
 const FANTASY_STALE_TIME = 60_000;
+const FANTASY_CACHE_VERSION = "v2";
 const H2H_STALE_TIME = 30_000;
 const MANAGERS_KEY = "h2h:managers";
 const MATCHES_KEY = "h2h:matches";
@@ -43,7 +44,7 @@ export class ApiRequestError extends Error {
 }
 
 function fantasyKey(leagueId: string, phase: number, gw: number) {
-  return `fantasy:${leagueId}:${phase}:${gw}`;
+  return `fantasy:${FANTASY_CACHE_VERSION}:${leagueId}:${phase}:${gw}`;
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
