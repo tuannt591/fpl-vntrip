@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import Image from "next/image";
-import { CircleDollarSign, UserRoundCheck } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUp, CircleDollarSign, Shuffle, Sparkles, UserRoundCheck } from "lucide-react";
 import { LeaderboardEntry, PlayerMatchStatus } from "@/types/fantasy";
 
 interface ManagerAccordionListProps {
@@ -16,11 +16,23 @@ export const ManagerAccordionList = ({
   const [selectedPlayer, setSelectedPlayer] = useState<any | null>(null);
   const [openItems, setOpenItems] = useState<string[]>([]);
   const [selectedAvatar, setSelectedAvatar] = useState<{ src: string; name: string } | null>(null);
-  const CHIP_CONFIG: Record<string, { label: string; variant: "secondary" | "destructive" | "default" | "outline" | "success" | "warning" }> = {
-    wildcard: { label: "WC", variant: "destructive" },
-    freehit: { label: "FH", variant: "destructive" },
-    bboost: { label: "BB", variant: "destructive" },
-    '3xc': { label: "TC", variant: "destructive" },
+  const CHIP_CONFIG: Record<string, { label: string; className: string }> = {
+    wildcard: {
+      label: "Wildcard",
+      className: "border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300",
+    },
+    freehit: {
+      label: "Free Hit",
+      className: "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+    },
+    bboost: {
+      label: "Bench Boost",
+      className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    },
+    '3xc': {
+      label: "Triple Captain",
+      className: "border-amber-500/35 bg-amber-500/10 text-amber-800 dark:text-amber-300",
+    },
   };
 
   function renderActiveChip(active_chip?: string | null) {
@@ -28,7 +40,13 @@ export const ManagerAccordionList = ({
     const chip = CHIP_CONFIG[active_chip];
     if (!chip) return null;
     return (
-      <Badge variant={chip.variant} className="text-xs font-normal px-2">
+      <Badge
+        variant="outline"
+        aria-label={`Chip đang kích hoạt: ${chip.label}`}
+        title={`Chip đang kích hoạt: ${chip.label}`}
+        className={`h-5 shrink-0 gap-1 whitespace-nowrap px-1.5 text-[10px] font-semibold leading-none shadow-none ${chip.className}`}
+      >
+        <Sparkles className="h-2.5 w-2.5" aria-hidden="true" />
         {chip.label}
       </Badge>
     );
@@ -241,6 +259,14 @@ export const ManagerAccordionList = ({
           const captain = entry.picks?.find((pick) => pick.is_captain);
           const transferCost = entry?.entryHistory?.transferCost;
           const isOpen = openItems.includes(entry.entry.toString());
+          const autoSubstitutions = entry.picks
+            .filter((pick) => pick.isAutoSubOut)
+            .map((outPlayer) => ({
+              outPlayer,
+              inPlayer: entry.picks.find(
+                (pick) => pick.element === outPlayer.autoSubPartnerElement,
+              ),
+            }));
 
           return (
             <AccordionItem
@@ -276,7 +302,7 @@ export const ManagerAccordionList = ({
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs font-semibold sm:text-sm">{entry.teamName}</p>
                       <div className="flex min-w-0 items-center gap-1.5">
-                        <p className="truncate text-[10px] text-muted-foreground sm:text-xs">{entry.manager}</p>
+                        <p className="min-w-0 flex-1 truncate text-[10px] text-muted-foreground sm:text-xs">{entry.manager}</p>
                         {renderActiveChip(entry.activeChip)}
                       </div>
                     </div>
@@ -328,13 +354,53 @@ export const ManagerAccordionList = ({
               <AccordionContent className="px-1 pb-2 pt-2" onClick={(e) => e.stopPropagation()}>
                 {entry.picks ? (
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between px-1">
+                    <div className="px-1">
                       <div>
                         <h3 className="text-xs font-bold sm:text-sm">Đội hình xuất phát</h3>
                         <p className="text-[10px] text-muted-foreground">Chạm cầu thủ để xem chi tiết</p>
                       </div>
-                      <span className="rounded-full bg-muted px-2 py-1 text-[10px] font-semibold text-muted-foreground">XI</span>
                     </div>
+
+                    {autoSubstitutions.length > 0 && (
+                      <section
+                        aria-label="Các lượt thay người tự động"
+                        className="rounded-xl border border-sky-500/25 bg-sky-500/[0.06] p-2 sm:p-2.5"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-sky-500/12 text-sky-700 dark:text-sky-300">
+                              <Shuffle className="h-3.5 w-3.5" aria-hidden="true" />
+                            </span>
+                            <div className="min-w-0">
+                              <h4 className="text-[11px] font-bold text-foreground sm:text-xs">Thay người tự động</h4>
+                              <p className="text-[10px] text-muted-foreground">Cầu thủ dự bị được tính điểm thay cho người không ra sân</p>
+                            </div>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[9px] font-bold text-sky-700 dark:text-sky-300">
+                            {autoSubstitutions.length} lượt
+                          </span>
+                        </div>
+
+                        <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                          {autoSubstitutions.map(({ outPlayer, inPlayer }) => (
+                            <div
+                              key={outPlayer.element}
+                              className="flex min-w-0 items-center gap-1.5 rounded-lg border border-sky-500/15 bg-background/70 px-2 py-1.5 text-[10px] shadow-sm"
+                            >
+                              <span className="flex min-w-0 flex-1 items-center gap-1 text-rose-600 dark:text-rose-400">
+                                <ArrowDown className="h-3 w-3 shrink-0" aria-hidden="true" />
+                                <span className="truncate font-semibold">{outPlayer.elementName}</span>
+                              </span>
+                              <ArrowRight className="h-3 w-3 shrink-0 text-sky-600 dark:text-sky-300" aria-hidden="true" />
+                              <span className="flex min-w-0 flex-1 items-center gap-1 text-emerald-700 dark:text-emerald-300">
+                                <ArrowUp className="h-3 w-3 shrink-0" aria-hidden="true" />
+                                <span className="truncate font-semibold">{inPlayer?.elementName ?? "—"}</span>
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+                    )}
 
                     {/* Starters (positions 1-11) */}
                     <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-emerald-500/20 bg-gradient-to-b from-emerald-500/[0.07] to-transparent p-1.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
@@ -347,11 +413,7 @@ export const ManagerAccordionList = ({
                           const allMatchesNotStarted = matchExplanations.length > 0 && matchExplanations.every(
                             (exp: any) => exp.match_status === PlayerMatchStatus.NOT_STARTED
                           );
-                          const allMatchesFinished = matchExplanations.length > 0 && matchExplanations.every(
-                            (exp: any) => exp.match_status === PlayerMatchStatus.SUBSTITUTE || exp.match_status === PlayerMatchStatus.PLAYED
-                          );
-                          const isAutoSubIn = pick.isAutoSubIn === true;
-                          const isAutoSubOut = !allMatchesNotStarted && allMatchesFinished && (pick?.stats?.minutes ?? 0) === 0;
+                          const isAutoSubOut = pick.isAutoSubOut === true;
 
                           const posBadge = getPositionBadge(pick.element_type ?? 4);
 
@@ -359,21 +421,18 @@ export const ManagerAccordionList = ({
                             <div
                               key={pick.position}
                               data-selected={selectedPlayer?.element === pick.element || undefined}
-                              className={`fpl-player-card flex cursor-pointer items-center gap-1 rounded-xl border p-1.5 text-xs shadow-sm transition-all duration-150 hover:scale-[1.02] hover:shadow-md active:scale-[0.98] sm:gap-2 sm:p-2 ${selectedPlayer?.element === pick.element ? "border-primary/70 ring-2 ring-primary/25" : ""} ${isAutoSubIn
-                                ? "bg-green-100 dark:bg-green-900/50 border-green-400 dark:border-green-600 ring-1 ring-green-300 dark:ring-green-700"
-                                : isAutoSubOut
+                              className={`fpl-player-card flex cursor-pointer items-center gap-1 rounded-xl border p-1.5 text-xs shadow-sm transition-all duration-150 hover:scale-[1.02] hover:shadow-md active:scale-[0.98] sm:gap-2 sm:p-2 ${selectedPlayer?.element === pick.element ? "border-primary/70 ring-2 ring-primary/25" : ""} ${isAutoSubOut
                                   ? "bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-700 ring-1 ring-red-200 dark:ring-red-800"
                                   : "bg-background/85 dark:bg-background/85 border-border/70 hover:border-primary/45"
                                 }`}
                               onClick={() => setSelectedPlayer(pick)}
-                              title={isAutoSubOut ? "Không được ra sân" : "Click để xem chi tiết"}
+                              title={isAutoSubOut ? "Đã được thay ra tự động" : "Click để xem chi tiết"}
                             >
                               <span className={`shrink-0 text-[9px] sm:text-[10px] font-bold px-1 py-0.5 rounded ${posBadge.className}`}>
                                 {posBadge.label}
                               </span>
                               <span className={`flex-1 truncate text-[11px] sm:text-xs font-medium ${isAutoSubOut ? 'text-red-500 dark:text-red-400' : 'text-black dark:text-white'}`}>
-                                {isAutoSubIn && <span className="text-green-600 mr-0.5" title="Auto Sub In">⬆️</span>}
-                                {isAutoSubOut && <span className="text-red-500 mr-0.5" title="Không ra sân">⬇️</span>}
+                                {isAutoSubOut && <ArrowDown className="mr-0.5 inline h-3 w-3 align-[-1px] text-rose-500" aria-label="Đã được thay ra tự động" />}
                                 {pick.elementName}&nbsp;
                                 {pick.is_captain && <span className="text-yellow-600 font-bold">(C)</span>}
                                 {pick.is_vice_captain && <span className="text-muted-foreground">(VC)</span>}
@@ -417,13 +476,13 @@ export const ManagerAccordionList = ({
                                 : "border-border/70 bg-background/70 hover:border-primary/40 hover:bg-background"
                                 }`}
                               onClick={() => setSelectedPlayer(pick)}
-                              title={isAutoSubIn ? "Auto Substituted In" : "Click để xem chi tiết"}
+                              title={isAutoSubIn ? "Đã được thay vào tự động" : "Click để xem chi tiết"}
                             >
                               <span className={`shrink-0 text-[9px] sm:text-[10px] font-bold px-1 py-0.5 rounded ${posBadge.className}`}>
                                 {posBadge.label}
                               </span>
                               <span className={`flex-1 truncate text-[10px] sm:text-[11px] ${isAutoSubIn ? 'text-green-700 dark:text-green-300 font-medium' : 'text-gray-700 dark:text-gray-300 font-medium'}`}>
-                                {isAutoSubIn && <span className="text-green-600 mr-0.5" title="Auto Sub">⬆️</span>}
+                                {isAutoSubIn && <ArrowUp className="mr-0.5 inline h-3 w-3 align-[-1px] text-emerald-600 dark:text-emerald-400" aria-label="Đã được thay vào tự động" />}
                                 {pick.elementName}
                               </span>
                               <span className={`font-mono text-[10px] sm:text-xs ${isAutoSubIn ? 'text-green-700 dark:text-green-300 font-bold' : allMatchesNotStarted ? 'text-orange-500 font-bold' : 'text-gray-600 dark:text-gray-400 font-bold'}`}>

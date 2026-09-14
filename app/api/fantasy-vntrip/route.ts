@@ -419,7 +419,12 @@ function applyAutoSub(
   requireFinished: boolean = false,
 ): any[] {
   // Create copy to avoid mutating original array
-  const result = picks.map(p => ({ ...p, isAutoSubIn: false }));
+  const result = picks.map(p => ({
+    ...p,
+    isAutoSubIn: false,
+    isAutoSubOut: false,
+    autoSubPartnerElement: undefined,
+  }));
 
   const starters = result.filter(p => p.position <= 11);
   const bench = result
@@ -475,8 +480,20 @@ function applyAutoSub(
 
       // Mark sub as subbed in
       const subIndex = result.findIndex(p => p.element === sub.element);
+      const starterIndex = result.findIndex(p => p.element === starter.element);
       if (subIndex !== -1) {
-        result[subIndex].isAutoSubIn = true;
+        result[subIndex] = {
+          ...result[subIndex],
+          isAutoSubIn: true,
+          autoSubPartnerElement: starter.element,
+        };
+      }
+      if (starterIndex !== -1) {
+        result[starterIndex] = {
+          ...result[starterIndex],
+          isAutoSubOut: true,
+          autoSubPartnerElement: sub.element,
+        };
       }
     }
   });

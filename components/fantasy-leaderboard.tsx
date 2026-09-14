@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Image from "next/image";
 import { ChevronDown, ChevronRight, RefreshCw, Search, Trophy } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -456,8 +457,8 @@ export const FantasyLeaderboard = () => {
       form: selectedTeamWeeks.slice(0, 5),
     };
   }, [selectedTeamWeeks]);
-  const managerNames = useMemo(
-    () => new Map(leaderboardData.map((entry) => [entry.entry, entry.manager])),
+  const managersByEntryId = useMemo(
+    () => new Map(leaderboardData.map((entry) => [entry.entry, entry])),
     [leaderboardData],
   );
   const filteredLeaderboardData = leaderboardData.filter((entry) => {
@@ -1092,10 +1093,10 @@ export const FantasyLeaderboard = () => {
                     const isExpanded = expandedTeamWeek === week.gw;
                     const matchupTeams = opponent
                       ? [
-                        { name: selectedTeamDialog ?? week.name, members: week.members },
-                        { name: opponent.name, members: opponent.members },
+                        { name: selectedTeamDialog ?? week.name, points: week.points, members: week.members },
+                        { name: opponent.name, points: opponent.points, members: opponent.members },
                       ]
-                      : [{ name: selectedTeamDialog ?? week.name, members: week.members }];
+                      : [{ name: selectedTeamDialog ?? week.name, points: week.points, members: week.members }];
 
                     return (
                       <li key={week.gw}>
@@ -1143,19 +1144,62 @@ export const FantasyLeaderboard = () => {
                             <div id={`team-week-details-${week.gw}`} className="border-t bg-muted/20 p-3.5">
                               <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Điểm từng manager</p>
                               <div className={`grid gap-2 ${matchupTeams.length > 1 ? 'sm:grid-cols-2' : ''}`}>
-                                {matchupTeams.map((team) => (
-                                  <section key={team.name} className="rounded-xl border bg-background p-2.5">
-                                    <p className={`mb-1.5 text-xs font-black ${TEAM_COLORS[team.name]?.text ?? 'text-foreground'}`}>{team.name}</p>
-                                    <ul className="space-y-1">
-                                      {team.members.map((member) => (
-                                        <li key={member.entryId} className="flex items-center justify-between gap-3 text-xs">
-                                          <span className="min-w-0 truncate text-muted-foreground">{managerNames.get(member.entryId) ?? `Manager #${member.entryId}`}</span>
-                                          <span className="shrink-0 font-mono font-bold">{member.points}</span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </section>
-                                ))}
+                                {matchupTeams.map((team) => {
+                                  const teamColors = TEAM_COLORS[team.name];
+
+                                  return (
+                                    <section key={team.name} className="overflow-hidden rounded-xl border bg-background">
+                                      <header className="flex items-center justify-between gap-2 border-b bg-muted/30 px-2.5 py-2">
+                                        <div className="flex min-w-0 items-center gap-1.5">
+                                          <span className={`h-2 w-2 shrink-0 rounded-full ${teamColors?.bar ?? 'bg-primary'}`} aria-hidden />
+                                          <p className={`truncate text-xs font-black ${teamColors?.text ?? 'text-foreground'}`}>{team.name}</p>
+                                        </div>
+                                        <span className="shrink-0 rounded-md bg-background px-1.5 py-0.5 font-mono text-[10px] font-black text-foreground shadow-sm">
+                                          {team.points}
+                                        </span>
+                                      </header>
+                                      <ul className="divide-y">
+                                      {team.members.map((member) => {
+                                        const manager = managersByEntryId.get(member.entryId);
+                                        const managerName = manager?.manager ?? `Manager #${member.entryId}`;
+
+                                        return (
+                                          <li key={member.entryId} className="grid min-w-0 grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-2 px-2.5 py-1.5">
+                                            {manager?.managerAvatar ? (
+                                              <Image
+                                                src={manager.managerAvatar}
+                                                alt={managerName}
+                                                width={24}
+                                                height={24}
+                                                unoptimized
+                                                className="h-6 w-6 rounded-full object-cover ring-1 ring-border"
+                                              />
+                                            ) : (
+                                              <span
+                                                aria-hidden="true"
+                                                className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[9px] font-black text-muted-foreground ring-1 ring-border"
+                                              >
+                                                {managerName.charAt(0).toLocaleUpperCase()}
+                                              </span>
+                                            )}
+                                            <span className="min-w-0">
+                                              <span className="block truncate text-[11px] font-semibold leading-tight text-foreground">
+                                                {manager?.teamName ?? `Đội #${member.entryId}`}
+                                              </span>
+                                              <span className="mt-0.5 block truncate text-[9px] leading-none text-muted-foreground">
+                                                {managerName}
+                                              </span>
+                                            </span>
+                                            <span className="min-w-7 rounded-md bg-muted px-1.5 py-0.5 text-center font-mono text-[10px] font-black text-foreground">
+                                              {member.points}
+                                            </span>
+                                          </li>
+                                        );
+                                      })}
+                                      </ul>
+                                    </section>
+                                  );
+                                })}
                               </div>
                             </div>
                           )}
