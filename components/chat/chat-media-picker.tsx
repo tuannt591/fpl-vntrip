@@ -271,7 +271,7 @@ export function ChatMediaPicker({
         aria-label="Đóng bảng emoji, sticker và GIF"
         onClick={onClose}
         className={cn(
-          "absolute bottom-full left-1/2 z-40 h-[100dvh] w-screen -translate-x-1/2 bg-foreground/15 backdrop-blur-[1px] transition-opacity sm:hidden",
+          "absolute bottom-full left-1/2 z-40 h-[100dvh] w-screen -translate-x-1/2 bg-black/35 backdrop-blur-sm transition-opacity sm:hidden",
           open ? "opacity-100" : "pointer-events-none opacity-0",
         )}
       />

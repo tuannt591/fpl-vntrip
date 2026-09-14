@@ -92,7 +92,10 @@ export const ManagerAccordionList = ({
 
     return (
       <Dialog open={!!selectedPlayer} onOpenChange={(open) => !open && setSelectedPlayer(null)}>
-        <DialogContent className="fpl-player-detail-dialog flex flex-col left-0 right-0 top-auto bottom-0 max-h-[88dvh] max-w-none translate-x-0 translate-y-0 gap-0 overflow-y-auto rounded-t-[1.5rem] border-x-0 border-b-0 bg-popover/95 p-0 shadow-2xl backdrop-blur-xl max-sm:data-[state=closed]:![--tw-exit-scale:1] max-sm:data-[state=closed]:![--tw-exit-translate-x:0] max-sm:data-[state=closed]:![--tw-exit-translate-y:100%] max-sm:data-[state=open]:![--tw-enter-scale:1] max-sm:data-[state=open]:![--tw-enter-translate-x:0] max-sm:data-[state=open]:![--tw-enter-translate-y:100%] [&>button]:right-3 [&>button]:top-3 [&>button]:z-10 [&>button]:rounded-full [&>button]:bg-background/85 [&>button]:p-1 [&>button]:shadow-sm sm:left-[50%] sm:right-auto sm:top-[50%] sm:max-w-lg sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-3xl sm:border sm:bg-background sm:backdrop-blur-none sm:[&>button]:right-4 sm:[&>button]:top-4 sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95">
+        <DialogContent
+          overlayClassName="!bg-black/35 backdrop-blur-sm"
+          className="fpl-player-detail-dialog flex flex-col left-0 right-0 top-auto bottom-0 max-h-[88dvh] max-w-none translate-x-0 translate-y-0 gap-0 overflow-y-auto rounded-t-[1.5rem] border-x-0 border-b-0 bg-popover/95 p-0 shadow-2xl backdrop-blur-xl max-sm:data-[state=closed]:![--tw-exit-scale:1] max-sm:data-[state=closed]:![--tw-exit-translate-x:0] max-sm:data-[state=closed]:![--tw-exit-translate-y:100%] max-sm:data-[state=open]:![--tw-enter-scale:1] max-sm:data-[state=open]:![--tw-enter-translate-x:0] max-sm:data-[state=open]:![--tw-enter-translate-y:100%] [&>button]:right-3 [&>button]:top-3 [&>button]:z-10 [&>button]:rounded-full [&>button]:bg-background/85 [&>button]:p-1 [&>button]:shadow-sm sm:left-[50%] sm:right-auto sm:top-[50%] sm:max-w-lg sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-3xl sm:border sm:bg-background sm:backdrop-blur-none sm:[&>button]:right-4 sm:[&>button]:top-4 sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95"
+        >
           <div
             aria-hidden="true"
             onTouchStart={handlePlayerSheetTouchStart}

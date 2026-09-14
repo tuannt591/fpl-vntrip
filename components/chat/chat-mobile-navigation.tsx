@@ -33,7 +33,10 @@ export function MobileChatNavigation() {
       >
         <Menu className="h-5 w-5" aria-hidden="true" />
       </button>
-      <DialogContent className="left-0 right-0 top-auto bottom-0 w-full max-w-none translate-x-0 translate-y-0 gap-0 rounded-t-[1.75rem] border-x-0 border-b-0 bg-background/95 p-0 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl backdrop-blur-xl max-sm:data-[state=closed]:![--tw-exit-scale:1] max-sm:data-[state=closed]:![--tw-exit-translate-x:0] max-sm:data-[state=closed]:![--tw-exit-translate-y:100%] max-sm:data-[state=open]:![--tw-enter-scale:1] max-sm:data-[state=open]:![--tw-enter-translate-x:0] max-sm:data-[state=open]:![--tw-enter-translate-y:100%] md:hidden [&>button]:right-4 [&>button]:top-4 [&>button]:rounded-full [&>button]:bg-muted [&>button]:p-1">
+      <DialogContent
+        overlayClassName="!bg-black/35 backdrop-blur-sm"
+        className="left-0 right-0 top-auto bottom-0 w-full max-w-none translate-x-0 translate-y-0 gap-0 rounded-t-[1.75rem] border-x-0 border-b-0 bg-background/95 p-0 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl backdrop-blur-xl max-sm:data-[state=closed]:![--tw-exit-scale:1] max-sm:data-[state=closed]:![--tw-exit-translate-x:0] max-sm:data-[state=closed]:![--tw-exit-translate-y:100%] max-sm:data-[state=open]:![--tw-enter-scale:1] max-sm:data-[state=open]:![--tw-enter-translate-x:0] max-sm:data-[state=open]:![--tw-enter-translate-y:100%] md:hidden [&>button]:right-4 [&>button]:top-4 [&>button]:rounded-full [&>button]:bg-muted [&>button]:p-1"
+      >
         <div aria-hidden="true" className="mx-auto mt-2 h-1 w-10 rounded-full bg-muted-foreground/25" />
         <nav aria-label="Điều hướng chính" className="space-y-1 p-3">
           {mobileNavigationItems.map(({ href, label, description, icon: Icon }) => {

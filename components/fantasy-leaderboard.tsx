@@ -646,7 +646,10 @@ export const FantasyLeaderboard = () => {
       </Card>
 
       <Dialog open={isScenarioOpen} onOpenChange={setIsScenarioOpen}>
-        <DialogContent className="bottom-0 left-0 right-0 top-auto max-h-[85dvh] max-w-none translate-x-0 translate-y-0 gap-3 overflow-y-auto rounded-t-3xl border-x-0 border-b-0 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] max-sm:data-[state=closed]:![--tw-exit-scale:1] max-sm:data-[state=closed]:![--tw-exit-translate-x:0] max-sm:data-[state=closed]:![--tw-exit-translate-y:100%] max-sm:data-[state=open]:![--tw-enter-scale:1] max-sm:data-[state=open]:![--tw-enter-translate-x:0] max-sm:data-[state=open]:![--tw-enter-translate-y:100%] sm:left-1/2 sm:top-1/2 sm:max-w-2xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border sm:p-6">
+        <DialogContent
+          overlayClassName="!bg-black/35 backdrop-blur-sm"
+          className="bottom-0 left-0 right-0 top-auto max-h-[85dvh] max-w-none translate-x-0 translate-y-0 gap-3 overflow-y-auto rounded-t-3xl border-x-0 border-b-0 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] max-sm:data-[state=closed]:![--tw-exit-scale:1] max-sm:data-[state=closed]:![--tw-exit-translate-x:0] max-sm:data-[state=closed]:![--tw-exit-translate-y:100%] max-sm:data-[state=open]:![--tw-enter-scale:1] max-sm:data-[state=open]:![--tw-enter-translate-x:0] max-sm:data-[state=open]:![--tw-enter-translate-y:100%] sm:left-1/2 sm:top-1/2 sm:max-w-2xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border sm:p-6"
+        >
           <div className="mx-auto h-1.5 w-10 rounded-full bg-muted sm:hidden" />
           <DialogHeader className="pr-8 text-left">
             <DialogTitle>Cầu thủ còn lại & xác suất</DialogTitle>
