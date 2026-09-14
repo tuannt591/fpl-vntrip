@@ -1,4 +1,4 @@
-import { type TouchEvent, useRef, useState } from "react";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -16,22 +16,6 @@ export const ManagerAccordionList = ({
   const [selectedPlayer, setSelectedPlayer] = useState<any | null>(null);
   const [openItems, setOpenItems] = useState<string[]>([]);
   const [selectedAvatar, setSelectedAvatar] = useState<{ src: string; name: string } | null>(null);
-  const playerSheetTouchStartYRef = useRef<number | null>(null);
-
-  const handlePlayerSheetTouchStart = (event: TouchEvent<HTMLDivElement>) => {
-    playerSheetTouchStartYRef.current = event.touches[0]?.clientY ?? null;
-  };
-
-  const handlePlayerSheetTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
-    const startY = playerSheetTouchStartYRef.current;
-    const endY = event.changedTouches[0]?.clientY;
-    playerSheetTouchStartYRef.current = null;
-
-    if (startY !== null && endY && endY - startY > 56) {
-      setSelectedPlayer(null);
-    }
-  };
-
   const CHIP_CONFIG: Record<string, { label: string; variant: "secondary" | "destructive" | "default" | "outline" | "success" | "warning" }> = {
     wildcard: { label: "WC", variant: "destructive" },
     freehit: { label: "FH", variant: "destructive" },
@@ -94,15 +78,15 @@ export const ManagerAccordionList = ({
       <Dialog open={!!selectedPlayer} onOpenChange={(open) => !open && setSelectedPlayer(null)}>
         <DialogContent
           overlayClassName="!bg-black/35 backdrop-blur-sm"
+          onMobileSwipeDown={() => setSelectedPlayer(null)}
           className="fpl-player-detail-dialog flex flex-col left-0 right-0 top-auto bottom-0 max-h-[88dvh] max-w-none translate-x-0 translate-y-0 gap-0 overflow-y-auto rounded-t-[1.5rem] border-x-0 border-b-0 bg-popover/95 p-0 shadow-2xl backdrop-blur-xl max-sm:data-[state=closed]:![--tw-exit-scale:1] max-sm:data-[state=closed]:![--tw-exit-translate-x:0] max-sm:data-[state=closed]:![--tw-exit-translate-y:100%] max-sm:data-[state=open]:![--tw-enter-scale:1] max-sm:data-[state=open]:![--tw-enter-translate-x:0] max-sm:data-[state=open]:![--tw-enter-translate-y:100%] [&>button]:right-3 [&>button]:top-3 [&>button]:z-10 [&>button]:rounded-full [&>button]:bg-background/85 [&>button]:p-1 [&>button]:shadow-sm sm:left-[50%] sm:right-auto sm:top-[50%] sm:max-w-lg sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-3xl sm:border sm:bg-background sm:backdrop-blur-none sm:[&>button]:right-4 sm:[&>button]:top-4 sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95"
         >
           <div
             aria-hidden="true"
-            onTouchStart={handlePlayerSheetTouchStart}
-            onTouchEnd={handlePlayerSheetTouchEnd}
-            className="absolute inset-x-0 top-0 z-10 flex h-7 justify-center pt-2 sm:hidden"
+            data-bottom-sheet-drag-handle
+            className="absolute inset-x-0 top-0 z-10 flex h-10 touch-none items-center justify-center sm:hidden"
           >
-            <span className="h-1 w-10 rounded-full bg-muted-foreground/25" />
+            <span className="bottom-sheet-drag-indicator" />
           </div>
 
           <section className="fpl-player-detail-hero relative shrink-0 overflow-hidden border-b bg-gradient-to-br from-primary/15 via-primary/[0.06] to-transparent px-4 pb-4 pt-5 sm:min-h-[134px] sm:px-6 sm:py-6">

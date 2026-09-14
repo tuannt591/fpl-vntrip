@@ -703,11 +703,22 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
       >
         <DialogContent
           overlayClassName="!bg-black/35 backdrop-blur-sm"
+          onMobileSwipeDown={() => {
+            setIsPickerOpen(false)
+            setPickerErrorMessage("")
+            setCreatedMatch(null)
+          }}
           className="flex max-h-[88dvh] max-w-none flex-col gap-0 overflow-hidden rounded-t-[1.75rem] border-x-0 border-b-0 p-0 max-sm:left-0 max-sm:right-0 max-sm:top-auto max-sm:bottom-0 max-sm:w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:data-[state=closed]:![--tw-exit-scale:1] max-sm:data-[state=closed]:![--tw-exit-translate-x:0] max-sm:data-[state=closed]:![--tw-exit-translate-y:100%] max-sm:data-[state=open]:![--tw-enter-scale:1] max-sm:data-[state=open]:![--tw-enter-translate-x:0] max-sm:data-[state=open]:![--tw-enter-translate-y:100%] sm:max-w-md sm:rounded-2xl"
         >
           {createdMatch ? (
             <>
-              <div aria-hidden="true" className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-muted-foreground/25 sm:hidden" />
+              <div
+                aria-hidden="true"
+                data-bottom-sheet-drag-handle
+                className="flex h-10 w-full shrink-0 touch-none items-center justify-center sm:hidden"
+              >
+                <span className="bottom-sheet-drag-indicator" />
+              </div>
               <DialogHeader className="border-b px-5 pb-4 pt-5">
                 <DialogTitle>Nhóm H2H đã được tạo</DialogTitle>
                 <DialogDescription>GW {createdMatch.gameweek}</DialogDescription>
@@ -742,7 +753,13 @@ export function H2HDashboard({ data }: { data: H2HDashboardData }) {
             </>
           ) : (
             <>
-              <div aria-hidden="true" className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-muted-foreground/25 sm:hidden" />
+              <div
+                aria-hidden="true"
+                data-bottom-sheet-drag-handle
+                className="flex h-10 w-full shrink-0 touch-none items-center justify-center sm:hidden"
+              >
+                <span className="bottom-sheet-drag-indicator" />
+              </div>
               <DialogHeader className="border-b px-5 pb-4 pt-5">
                 <DialogTitle>Chọn đối thủ</DialogTitle>
                 <DialogDescription>

@@ -41,7 +41,8 @@ async function getWeeklyTeamResults(currentEvent: number): Promise<any> {
     });
 
     const weeklyResults: any[] = [];
-    for (let gw = 2; gw <= currentEvent; gw++) {
+    const firstGameweek = Math.max(1, WIN_LOSS_START_GW);
+    for (let gw = firstGameweek; gw <= currentEvent; gw++) {
       const teamResults = [];
       for (const [teamName, entryIds] of Object.entries(TEAMS_CONFIG)) {
         let teamTotal = 0;

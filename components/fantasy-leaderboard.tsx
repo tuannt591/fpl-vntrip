@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshCw, Search, Trophy } from "lucide-react";
+import { ChevronDown, ChevronRight, RefreshCw, Search, Trophy } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ManagerAccordionList } from './ui/manager-accordion-list';
@@ -16,6 +16,7 @@ import {
   TeamConfig,
   TeamStats,
   TeamWeeklyData,
+  WeeklyTeamResult,
 } from '@/types/fantasy';
 import { VNTRIP_LEAGUE_ID, CURRENT_PHASE } from '@/lib/fpl-config';
 import { primaryPageContainerClassName } from "@/lib/page-layout";
@@ -116,6 +117,36 @@ type TeamLiveScenario = {
   uniqueRemainingPlayers: number;
   players: RemainingPlayer[];
 };
+
+type TeamHistoryWeek = WeeklyTeamResult & {
+  gw: number;
+  opponent: WeeklyTeamResult | null;
+};
+
+function getTeamResultPresentation(result: WeeklyTeamResult['result']) {
+  if (result === 'win') {
+    return {
+      label: 'Thắng',
+      shortLabel: 'W',
+      badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+      markerClass: 'bg-emerald-500',
+    };
+  }
+  if (result === 'loss') {
+    return {
+      label: 'Thua',
+      shortLabel: 'L',
+      badgeClass: 'bg-destructive/10 text-destructive',
+      markerClass: 'bg-destructive',
+    };
+  }
+  return {
+    label: 'Hòa',
+    shortLabel: 'D',
+    badgeClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
+    markerClass: 'bg-amber-500',
+  };
+}
 
 function hasNotStartedFixture(pick: LeaderboardEntry['picks'][number]) {
   return (pick.explain ?? []).some(
@@ -315,6 +346,7 @@ export const FantasyLeaderboard = () => {
     () => initialData?.teamWeeklyData ?? null,
   );
   const [selectedTeamDialog, setSelectedTeamDialog] = useState<string | null>(null);
+  const [expandedTeamWeek, setExpandedTeamWeek] = useState<number | null>(null);
   const [isScenarioOpen, setIsScenarioOpen] = useState(false);
   const [teamFilter, setTeamFilter] = useState<TeamFilter>("all");
   const [managerQuery, setManagerQuery] = useState("");
@@ -383,13 +415,37 @@ export const FantasyLeaderboard = () => {
     ? teamWeeklyData.teamRecords[selectedTeamDialog]
     : null;
 
-  // Get weekly list for selected team
-  const selectedTeamWeeks = selectedTeamDialog && teamWeeklyData
-    ? [...teamWeeklyData.weeklyResults].reverse().map(week => {
-      const teamResult = week.teams.find(t => t.name === selectedTeamDialog);
-      return { gw: week.gw, ...teamResult };
-    }).filter(w => w.result)
-    : [];
+  const selectedTeamWeeks = useMemo<TeamHistoryWeek[]>(() => {
+    if (!selectedTeamDialog || !teamWeeklyData) return [];
+
+    return [...teamWeeklyData.weeklyResults]
+      .reverse()
+      .flatMap((week) => {
+        const team = week.teams.find((item) => item.name === selectedTeamDialog);
+        if (!team) return [];
+
+        return [{
+          ...team,
+          gw: week.gw,
+          opponent: week.teams.find((item) => item.name !== selectedTeamDialog) ?? null,
+        }];
+      });
+  }, [selectedTeamDialog, teamWeeklyData]);
+  const selectedTeamSummary = useMemo(() => {
+    const totalPoints = selectedTeamWeeks.reduce((sum, week) => sum + week.points, 0);
+
+    return {
+      totalPoints,
+      averagePoints: selectedTeamWeeks.length
+        ? Math.round(totalPoints / selectedTeamWeeks.length)
+        : 0,
+      form: selectedTeamWeeks.slice(0, 5),
+    };
+  }, [selectedTeamWeeks]);
+  const managerNames = useMemo(
+    () => new Map(leaderboardData.map((entry) => [entry.entry, entry.manager])),
+    [leaderboardData],
+  );
   const filteredLeaderboardData = leaderboardData.filter((entry) => {
     const matchesTeam = teamFilter === "all" || entry.team === teamFilter;
     const query = managerQuery.trim().toLocaleLowerCase();
@@ -536,12 +592,9 @@ export const FantasyLeaderboard = () => {
                         : 0;
 
                       return (
-                        <button
+                        <div
                           key={team.name}
-                          type="button"
-                          disabled={!record}
-                          onClick={() => setSelectedTeamDialog(shortName)}
-                          className={`group relative min-w-0 bg-gradient-to-br p-3 text-left transition sm:p-4 ${colors?.surface || "from-muted/60 to-transparent"} ${record ? "hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset" : "cursor-default"}`}
+                          className={`relative min-w-0 bg-gradient-to-br p-3 text-left sm:p-4 ${colors?.surface || "from-muted/60 to-transparent"}`}
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
@@ -565,18 +618,35 @@ export const FantasyLeaderboard = () => {
                               style={{ width: `${pointShare}%` }}
                             />
                           </div>
-                          <div className="mt-3 flex items-center justify-between gap-1 text-[10px] font-semibold sm:text-xs">
+                          <div className="mt-3 flex items-center justify-between gap-2 text-[10px] font-semibold sm:text-xs">
                             {record ? (
-                              <span className="font-mono">
-                                <span className="text-emerald-600 dark:text-emerald-400">{record.wins}W</span>
-                                <span className="mx-1 text-muted-foreground">·</span>
-                                <span className="text-destructive">{record.losses}L</span>
-                              </span>
+                              <>
+                                <span className="font-mono">
+                                  <span className="text-emerald-600 dark:text-emerald-400">{record.wins}W</span>
+                                  <span className="mx-1 text-muted-foreground">·</span>
+                                  <span className="text-amber-600 dark:text-amber-400">{record.mid}H</span>
+                                  <span className="mx-1 text-muted-foreground">·</span>
+                                  <span className="text-destructive">{record.losses}L</span>
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setExpandedTeamWeek(null);
+                                    setSelectedTeamDialog(shortName);
+                                  }}
+                                  aria-label={`Xem lịch sử đối đầu của ${team.name}`}
+                                  title="Xem lịch sử đối đầu"
+                                  className="-mr-1 inline-flex h-8 shrink-0 items-center gap-0.5 rounded-md px-1 text-[10px] font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 sm:text-xs"
+                                >
+                                  Lịch sử
+                                  <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+                                </button>
+                              </>
                             ) : (
                               <span className="text-muted-foreground">Chưa có đối đầu</span>
                             )}
                           </div>
-                        </button>
+                        </div>
                       );
                     })}
                     {teamStats.length === 2 && (
@@ -648,9 +718,16 @@ export const FantasyLeaderboard = () => {
       <Dialog open={isScenarioOpen} onOpenChange={setIsScenarioOpen}>
         <DialogContent
           overlayClassName="!bg-black/35 backdrop-blur-sm"
+          onMobileSwipeDown={() => setIsScenarioOpen(false)}
           className="bottom-0 left-0 right-0 top-auto max-h-[85dvh] max-w-none translate-x-0 translate-y-0 gap-3 overflow-y-auto rounded-t-3xl border-x-0 border-b-0 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] max-sm:data-[state=closed]:![--tw-exit-scale:1] max-sm:data-[state=closed]:![--tw-exit-translate-x:0] max-sm:data-[state=closed]:![--tw-exit-translate-y:100%] max-sm:data-[state=open]:![--tw-enter-scale:1] max-sm:data-[state=open]:![--tw-enter-translate-x:0] max-sm:data-[state=open]:![--tw-enter-translate-y:100%] sm:left-1/2 sm:top-1/2 sm:max-w-2xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border sm:p-6"
         >
-          <div className="mx-auto h-1.5 w-10 rounded-full bg-muted sm:hidden" />
+          <div
+            aria-hidden="true"
+            data-bottom-sheet-drag-handle
+            className="flex h-10 w-full touch-none items-center justify-center sm:hidden"
+          >
+            <span className="bottom-sheet-drag-indicator" />
+          </div>
           <DialogHeader className="pr-8 text-left">
             <DialogTitle>Cầu thủ còn lại & xác suất</DialogTitle>
             <DialogDescription>
@@ -735,58 +812,211 @@ export const FantasyLeaderboard = () => {
       </Dialog>
 
       {/* Team Weekly Dialog */}
-      <Dialog open={!!selectedTeamDialog} onOpenChange={(open) => !open && setSelectedTeamDialog(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className={`text-center ${selectedTeamDialog ? TEAM_COLORS[selectedTeamDialog]?.text : ''}`}>
-              {selectedTeamDialog} Team
-            </DialogTitle>
-            <DialogDescription className="text-center">
-              {selectedTeamRecord && (
-                <span className="font-mono text-base">
-                  <span className="text-green-600 font-bold">{selectedTeamRecord.wins} Wins</span>
-                  {' · '}
-                  <span className="text-red-500 font-bold">{selectedTeamRecord.losses} Losses</span>
+      <Dialog
+        open={!!selectedTeamDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setExpandedTeamWeek(null);
+            setSelectedTeamDialog(null);
+          }
+        }}
+      >
+        <DialogContent
+          overlayClassName="!bg-black/40 backdrop-blur-sm"
+          onMobileSwipeDown={() => {
+            setExpandedTeamWeek(null)
+            setSelectedTeamDialog(null)
+          }}
+          className="flex max-h-[88dvh] max-w-none flex-col gap-0 overflow-hidden rounded-t-[1.75rem] border-x-0 border-b-0 p-0 shadow-2xl max-sm:bottom-0 max-sm:left-0 max-sm:right-0 max-sm:top-auto max-sm:w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:data-[state=closed]:![--tw-exit-scale:1] max-sm:data-[state=closed]:![--tw-exit-translate-x:0] max-sm:data-[state=closed]:![--tw-exit-translate-y:100%] max-sm:data-[state=open]:![--tw-enter-scale:1] max-sm:data-[state=open]:![--tw-enter-translate-x:0] max-sm:data-[state=open]:![--tw-enter-translate-y:100%] [&>button]:right-4 [&>button]:top-4 [&>button]:z-10 [&>button]:rounded-full [&>button]:bg-background/85 [&>button]:p-1 [&>button]:shadow-sm sm:max-w-xl sm:rounded-3xl sm:border"
+        >
+          <div className="shrink-0 border-b bg-background/95 px-4 pb-3 pt-0 backdrop-blur sm:px-6 sm:pt-5">
+            <div
+              aria-hidden="true"
+              data-bottom-sheet-drag-handle
+              className="flex h-8 w-full touch-none items-center justify-center sm:hidden"
+            >
+              <span className="bottom-sheet-drag-indicator" />
+            </div>
+            <DialogHeader className="pr-10 text-left">
+              <div className="flex items-center gap-3">
+                <span
+                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-sm font-black ${selectedTeamDialog ? TEAM_COLORS[selectedTeamDialog]?.bg : 'bg-muted'} ${selectedTeamDialog ? TEAM_COLORS[selectedTeamDialog]?.text : 'text-foreground'}`}
+                >
+                  {selectedTeamDialog?.charAt(0)}
                 </span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
+                <div className="min-w-0">
+                  <DialogTitle className={`truncate text-lg font-black tracking-tight ${selectedTeamDialog ? TEAM_COLORS[selectedTeamDialog]?.text : ''}`}>
+                    {selectedTeamDialog}
+                  </DialogTitle>
+                  <DialogDescription className="mt-0.5 text-xs">
+                    Thành tích đối đầu theo từng Gameweek
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+          </div>
 
-          <div className="max-h-[400px] overflow-y-auto -mx-2">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-background">
-                <tr className="border-b">
-                  <th className="py-1.5 px-2 text-left font-semibold text-xs">GW</th>
-                  <th className="py-1.5 px-2 text-center font-semibold text-xs">Points</th>
-                  <th className="py-1.5 px-2 text-center font-semibold text-xs">Result</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedTeamWeeks.map(week => (
-                  <tr key={week.gw} className="border-b border-gray-100 dark:border-gray-800">
-                    <td className="py-1.5 px-2 font-medium text-xs">GW {week.gw}</td>
-                    <td className="py-1.5 px-2 text-center font-mono text-xs">{week.points}</td>
-                    <td className="py-1.5 px-2 text-center">
-                      {week.result === 'win' && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-semibold">
-                          🏆 Wins
-                        </span>
-                      )}
-                      {week.result === 'loss' && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs font-semibold">
-                          Losses
-                        </span>
-                      )}
-                      {week.result === 'mid' && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 text-xs">
-                          Draw
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-6 sm:pb-6">
+            <section
+              className={`mt-4 overflow-hidden rounded-2xl border bg-gradient-to-br p-4 ${selectedTeamDialog ? TEAM_COLORS[selectedTeamDialog]?.surface : 'from-muted/70 to-transparent'} ${selectedTeamDialog ? TEAM_COLORS[selectedTeamDialog]?.border : 'border-border'}`}
+              aria-label="Tóm tắt thành tích"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                    Thành tích đối đầu
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {selectedTeamWeeks.length > 0
+                      ? `GW ${teamWeeklyData?.winLossStartGW ?? 1} – GW ${selectedTeamWeeks[0].gw}`
+                      : 'Chưa có Gameweek hoàn tất'}
+                  </p>
+                </div>
+                <span className="rounded-full border bg-background/80 px-2.5 py-1 font-mono text-[10px] font-bold text-muted-foreground shadow-sm">
+                  {selectedTeamWeeks.length} GW
+                </span>
+              </div>
+
+              <dl className="mt-4 grid grid-cols-3 divide-x overflow-hidden rounded-xl border bg-background/75 shadow-sm">
+                <div className="px-2 py-2.5 text-center">
+                  <dt className="text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Thắng</dt>
+                  <dd className="mt-0.5 font-mono text-2xl font-black text-emerald-700 dark:text-emerald-300">{selectedTeamRecord?.wins ?? 0}</dd>
+                </div>
+                <div className="px-2 py-2.5 text-center">
+                  <dt className="text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300">Hòa</dt>
+                  <dd className="mt-0.5 font-mono text-2xl font-black text-amber-700 dark:text-amber-300">{selectedTeamRecord?.mid ?? 0}</dd>
+                </div>
+                <div className="px-2 py-2.5 text-center">
+                  <dt className="text-[10px] font-bold uppercase tracking-wide text-destructive">Thua</dt>
+                  <dd className="mt-0.5 font-mono text-2xl font-black text-destructive">{selectedTeamRecord?.losses ?? 0}</dd>
+                </div>
+              </dl>
+
+              <div className="mt-3 flex items-center justify-between gap-3 text-xs">
+                <div className="min-w-0">
+                  <p className="font-semibold text-foreground">Phong độ 5 GW gần nhất</p>
+                  <div className="mt-1.5 flex items-center gap-1.5" aria-label="Phong độ 5 Gameweek gần nhất">
+                    {selectedTeamSummary.form.length > 0 ? (
+                      selectedTeamSummary.form.map((week) => {
+                        const result = getTeamResultPresentation(week.result);
+                        return (
+                          <span
+                            key={week.gw}
+                            title={`GW ${week.gw}: ${result.label}`}
+                            className={`flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-black ${result.badgeClass}`}
+                          >
+                            {result.shortLabel}
+                          </span>
+                        );
+                      })
+                    ) : (
+                      <span className="text-muted-foreground">Chưa có dữ liệu</span>
+                    )}
+                  </div>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="font-mono text-base font-black text-foreground">{selectedTeamSummary.averagePoints}</p>
+                  <p className="text-[10px] font-medium text-muted-foreground">điểm TB/GW</p>
+                </div>
+              </div>
+            </section>
+
+            <section className="mt-5" aria-labelledby="team-history-heading">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div>
+                  <h3 id="team-history-heading" className="text-sm font-black">Lịch sử đối đầu</h3>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">Mới nhất hiển thị trước · chạm để xem điểm từng manager</p>
+                </div>
+              </div>
+
+              {selectedTeamWeeks.length === 0 ? (
+                <div className="rounded-2xl border border-dashed bg-muted/20 px-4 py-10 text-center">
+                  <p className="text-sm font-semibold">Chưa có kết quả đối đầu</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Kết quả sẽ xuất hiện sau khi dữ liệu Gameweek được tổng hợp.</p>
+                </div>
+              ) : (
+                <ol className="space-y-2.5">
+                  {selectedTeamWeeks.map((week) => {
+                    const result = getTeamResultPresentation(week.result);
+                    const opponent = week.opponent;
+                    const pointDifference = opponent ? week.points - opponent.points : null;
+                    const isExpanded = expandedTeamWeek === week.gw;
+                    const matchupTeams = opponent
+                      ? [
+                        { name: selectedTeamDialog ?? week.name, members: week.members },
+                        { name: opponent.name, members: opponent.members },
+                      ]
+                      : [{ name: selectedTeamDialog ?? week.name, members: week.members }];
+
+                    return (
+                      <li key={week.gw}>
+                        <article className="overflow-hidden rounded-2xl border bg-card shadow-sm transition-shadow hover:shadow-md">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedTeamWeek(isExpanded ? null : week.gw)}
+                            aria-expanded={isExpanded}
+                            aria-controls={`team-week-details-${week.gw}`}
+                            className="relative block w-full p-3.5 text-left outline-none transition-colors hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
+                          >
+                            <span className={`absolute bottom-0 left-0 top-0 w-1 ${result.markerClass}`} aria-hidden />
+                            <div className="flex items-center justify-between gap-3 pl-1.5">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-xs font-black text-muted-foreground">GW {week.gw}</span>
+                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${result.badgeClass}`}>{result.label}</span>
+                              </div>
+                              <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} aria-hidden />
+                            </div>
+
+                            <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 pl-1.5">
+                              <div className="min-w-0">
+                                <p className={`truncate text-[11px] font-bold ${selectedTeamDialog ? TEAM_COLORS[selectedTeamDialog]?.text : 'text-foreground'}`}>{selectedTeamDialog}</p>
+                                <p className="mt-0.5 font-mono text-2xl font-black tracking-tight">{week.points.toLocaleString()}</p>
+                              </div>
+                              <span className="rounded-full border bg-muted/50 px-2 py-1 font-mono text-[10px] font-bold text-muted-foreground">VS</span>
+                              <div className="min-w-0 text-right">
+                                <p className={`truncate text-[11px] font-bold ${opponent ? TEAM_COLORS[opponent.name]?.text : 'text-muted-foreground'}`}>{opponent?.name ?? '—'}</p>
+                                <p className="mt-0.5 font-mono text-2xl font-black tracking-tight text-muted-foreground">{opponent?.points.toLocaleString() ?? '—'}</p>
+                              </div>
+                            </div>
+
+                            <p className="mt-2 pl-1.5 text-[11px] font-semibold text-muted-foreground">
+                              {pointDifference === null
+                                ? 'Chưa có dữ liệu đội đối thủ'
+                                : pointDifference === 0
+                                  ? 'Hai đội bằng điểm'
+                                  : pointDifference > 0
+                                    ? `Hơn ${pointDifference.toLocaleString()} điểm`
+                                    : `Kém ${Math.abs(pointDifference).toLocaleString()} điểm`}
+                            </p>
+                          </button>
+
+                          {isExpanded && (
+                            <div id={`team-week-details-${week.gw}`} className="border-t bg-muted/20 p-3.5">
+                              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Điểm từng manager</p>
+                              <div className={`grid gap-2 ${matchupTeams.length > 1 ? 'sm:grid-cols-2' : ''}`}>
+                                {matchupTeams.map((team) => (
+                                  <section key={team.name} className="rounded-xl border bg-background p-2.5">
+                                    <p className={`mb-1.5 text-xs font-black ${TEAM_COLORS[team.name]?.text ?? 'text-foreground'}`}>{team.name}</p>
+                                    <ul className="space-y-1">
+                                      {team.members.map((member) => (
+                                        <li key={member.entryId} className="flex items-center justify-between gap-3 text-xs">
+                                          <span className="min-w-0 truncate text-muted-foreground">{managerNames.get(member.entryId) ?? `Manager #${member.entryId}`}</span>
+                                          <span className="shrink-0 font-mono font-bold">{member.points}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </section>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </article>
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+            </section>
           </div>
         </DialogContent>
       </Dialog>

@@ -126,9 +126,13 @@ export function ChatMediaPicker({
   const [hasOpenedSticker, setHasOpenedSticker] = useState(false);
   const [recentEmojis, setRecentEmojis] = useState<string[]>([]);
   const [isStickerLoading, setIsStickerLoading] = useState(true);
+  const [sheetDragOffset, setSheetDragOffset] = useState(0);
+  const [isSheetDragging, setIsSheetDragging] = useState(false);
+  const [isSheetSnappingBack, setIsSheetSnappingBack] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const sheetTouchStartYRef = useRef<number | null>(null);
+  const sheetTouchStartRef = useRef<{ y: number; timestamp: number } | null>(null);
+  const sheetSnapBackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     try {
@@ -149,6 +153,10 @@ export function ChatMediaPicker({
   useEffect(() => {
     if (hasOpenedSticker) setIsStickerLoading(true);
   }, [hasOpenedSticker, stickerIframeUrl]);
+
+  useEffect(() => () => {
+    if (sheetSnapBackTimeoutRef.current) clearTimeout(sheetSnapBackTimeoutRef.current);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -248,19 +256,73 @@ export function ChatMediaPicker({
     });
   };
 
+  const resetSheetToRestingPosition = () => {
+    setIsSheetDragging(false);
+    setIsSheetSnappingBack(true);
+    setSheetDragOffset(0);
+
+    if (sheetSnapBackTimeoutRef.current) clearTimeout(sheetSnapBackTimeoutRef.current);
+    sheetSnapBackTimeoutRef.current = setTimeout(() => {
+      setIsSheetSnappingBack(false);
+      sheetSnapBackTimeoutRef.current = null;
+    }, 180);
+  };
+
   const handleSheetTouchStart = (event: TouchEvent<HTMLDivElement>) => {
-    sheetTouchStartYRef.current = event.touches[0]?.clientY ?? null;
+    const touch = event.touches[0];
+    if (!touch) return;
+
+    if (sheetSnapBackTimeoutRef.current) clearTimeout(sheetSnapBackTimeoutRef.current);
+    setIsSheetSnappingBack(false);
+    sheetTouchStartRef.current = { y: touch.clientY, timestamp: event.timeStamp };
+  };
+
+  const handleSheetTouchMove = (event: TouchEvent<HTMLDivElement>) => {
+    const touch = event.touches[0];
+    const touchStart = sheetTouchStartRef.current;
+    if (!touch || !touchStart) return;
+
+    const nextOffset = Math.max(0, touch.clientY - touchStart.y);
+    if (nextOffset === 0) return;
+
+    setIsSheetDragging(true);
+    setSheetDragOffset(Math.min(nextOffset, 320));
   };
 
   const handleSheetTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
-    const startY = sheetTouchStartYRef.current;
-    const endY = event.changedTouches[0]?.clientY;
-    sheetTouchStartYRef.current = null;
+    const touchStart = sheetTouchStartRef.current;
+    const touch = event.changedTouches[0];
+    sheetTouchStartRef.current = null;
 
-    if (startY !== null && endY && endY - startY > 56) {
-      onClose();
+    if (!touchStart || !touch) {
+      resetSheetToRestingPosition();
+      return;
     }
+
+    const draggedDistance = Math.max(0, touch.clientY - touchStart.y);
+    const elapsed = Math.max(1, event.timeStamp - touchStart.timestamp);
+    const velocity = draggedDistance / elapsed;
+    const sheetHeight = pickerRef.current?.getBoundingClientRect().height ?? window.innerHeight * 0.58;
+    const closeThreshold = Math.min(160, Math.max(96, sheetHeight * 0.24));
+    const shouldClose =
+      draggedDistance >= closeThreshold || (draggedDistance >= 48 && velocity >= 0.55);
+
+    if (!shouldClose) {
+      resetSheetToRestingPosition();
+      return;
+    }
+
+    setIsSheetDragging(false);
+    setSheetDragOffset(0);
+    window.requestAnimationFrame(onClose);
   };
+
+  const sheetDragStyle = isSheetDragging || isSheetSnappingBack
+    ? {
+        transform: `translate3d(0, ${sheetDragOffset}px, 0)`,
+        transition: isSheetDragging ? "none" : "transform 180ms cubic-bezier(0.22, 1, 0.36, 1)",
+      }
+    : undefined;
 
   const activeTabIndex = activeTab === "emoji" ? 0 : activeTab === "sticker" ? 1 : 2;
 
@@ -270,6 +332,12 @@ export function ChatMediaPicker({
         type="button"
         aria-label="Đóng bảng emoji, sticker và GIF"
         onClick={onClose}
+        style={isSheetDragging ? {
+          opacity: Math.max(
+            0.2,
+            1 - sheetDragOffset / (pickerRef.current?.getBoundingClientRect().height ?? 1),
+          ),
+        } : undefined}
         className={cn(
           "absolute bottom-full left-1/2 z-40 h-[100dvh] w-screen -translate-x-1/2 bg-black/35 backdrop-blur-sm transition-opacity sm:hidden",
           open ? "opacity-100" : "pointer-events-none opacity-0",
@@ -280,6 +348,7 @@ export function ChatMediaPicker({
         role="dialog"
         aria-label="Chọn emoji, sticker hoặc GIF"
         aria-hidden={!open}
+        style={sheetDragStyle}
         className={cn(
           "absolute inset-x-0 bottom-full z-50 flex h-[min(58dvh,30rem)] w-full origin-bottom flex-col overflow-hidden rounded-t-[1.5rem] border border-b-0 bg-popover/95 text-popover-foreground shadow-[0_-20px_55px_-30px_rgba(15,23,42,0.55)] backdrop-blur-xl transition duration-200 sm:inset-x-auto sm:right-4 sm:mb-2 sm:h-[420px] sm:max-h-[calc(100dvh_-_16rem)] sm:w-[min(440px,calc(100vw-2rem))] sm:origin-bottom-right sm:rounded-2xl sm:border sm:bg-popover sm:shadow-[0_24px_70px_-35px_rgba(15,23,42,0.45)]",
           open
@@ -290,10 +359,12 @@ export function ChatMediaPicker({
         <div
           aria-hidden="true"
           onTouchStart={handleSheetTouchStart}
+          onTouchMove={handleSheetTouchMove}
           onTouchEnd={handleSheetTouchEnd}
-          className="flex shrink-0 justify-center py-2 sm:hidden"
+          onTouchCancel={handleSheetTouchEnd}
+          className="flex h-10 shrink-0 touch-none justify-center py-4 sm:hidden"
         >
-          <span className="h-1 w-10 rounded-full bg-muted-foreground/35" />
+          <span className="bottom-sheet-drag-indicator" />
         </div>
         <header className="flex h-12 shrink-0 items-center gap-2 border-b px-2.5">
           <div

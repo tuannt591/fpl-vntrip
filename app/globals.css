@@ -157,6 +157,10 @@ html {
 
 /* Custom utilities */
 @layer utilities {
+  .bottom-sheet-drag-indicator {
+    @apply h-1 w-10 rounded-full bg-muted-foreground/30;
+  }
+
   .scrollbar-hide {
     -ms-overflow-style: none; /* Internet Explorer 10+ */
     scrollbar-width: none; /* Firefox */
