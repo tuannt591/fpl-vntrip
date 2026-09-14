@@ -41,6 +41,11 @@ export type PickWithLive = Pick & {
   elementName?: string;
   element_type?: number;
   isAutoSubIn?: boolean;
+  projection?: {
+    form: number;
+    pointsPerGame: number;
+    chanceOfPlaying: number | null;
+  };
 };
 
 export type PicksData = {

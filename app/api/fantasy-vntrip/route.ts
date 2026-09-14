@@ -747,12 +747,13 @@ export async function GET(request: NextRequest) {
           let avatar: string | undefined = undefined;
           let clubName: string | undefined = undefined;
           let elementType: number | undefined = undefined;
+          let player: any = null;
 
           if (liveData) {
             live = liveDataByElementId.get(pick.element) || null;
           }
           if (elements) {
-            const player = elementsById.get(pick.element);
+            player = elementsById.get(pick.element) || null;
             elementName = player ? player.web_name : undefined;
             avatar = player ? `${player.code}.png` : undefined;
             elementType = player ? player.element_type : undefined;
@@ -768,6 +769,14 @@ export async function GET(request: NextRequest) {
             element_type: elementType,
             explain: live?.explain ?? [],
             stats: live?.stats ?? {},
+            projection: {
+              form: Number(player?.form) || 0,
+              pointsPerGame: Number(player?.points_per_game) || 0,
+              chanceOfPlaying:
+                typeof player?.chance_this_round === 'number'
+                  ? player.chance_this_round
+                  : null,
+            },
           };
         });
 
