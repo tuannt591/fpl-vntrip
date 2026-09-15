@@ -22,7 +22,13 @@ const nextConfig = {
         protocol: "https",
         hostname: "github.com",
       },
+      {
+        protocol: "https",
+        hostname: "resources.premierleague.com",
+        pathname: "/premierleague25/photos/players/**",
+      },
     ],
+    minimumCacheTTL: 60 * 60 * 24 * 7,
   },
   webpack: (config) => {
     config.resolve.alias["openmls_wasm_bg.wasm"] = path.join(

@@ -40,6 +40,8 @@ export type PickWithLive = Pick & {
   liveData?: LivePlayerData | null;
   elementName?: string;
   element_type?: number;
+  clubName?: string;
+  avatar?: string;
   isAutoSubIn?: boolean;
   isAutoSubOut?: boolean;
   autoSubPartnerElement?: number;
