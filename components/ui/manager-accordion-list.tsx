@@ -183,19 +183,19 @@ export const ManagerAccordionList = ({
         title={`${pick.elementName ?? "Cầu thủ"} — chạm để xem chi tiết`}
         className={`fpl-pitch-player relative z-10 flex w-full flex-col items-center outline-none transition-transform duration-150 hover:z-20 hover:scale-105 focus-visible:z-20 focus-visible:scale-105 focus-visible:ring-2 focus-visible:ring-primary/80 ${isAutoSubOut ? "opacity-60" : ""}`}
       >
-        <span className="relative flex h-6 w-6 items-center justify-center max-[349px]:h-5 max-[349px]:w-5 min-[350px]:h-7 min-[350px]:w-7 min-[400px]:h-9 min-[400px]:w-9 sm:h-10 sm:w-10 md:h-12 md:w-12 lg:h-14 lg:w-14">
-          <span className={`h-full w-full overflow-hidden rounded-full border-2 bg-background shadow-md ${isAutoSubOut ? "border-rose-400" : "border-background/95"}`}>
+        <span className="relative flex h-12 w-12 items-center justify-center md:h-12 md:w-12 lg:h-14 lg:w-14">
+          <span className={`h-full w-full overflow-hidden rounded-full border-1 bg-background shadow-md ${isAutoSubOut ? "border-rose-400" : "border-background/95"}`}>
             <PlayerAvatar
               avatar={pick.avatar}
               name={pick.elementName}
               className="h-full w-full"
             />
           </span>
-          {pick.is_captain && <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-background bg-amber-400 text-[8px] font-black text-amber-950 md:h-4 md:w-4 md:text-[9px]">C</span>}
-          {!pick.is_captain && pick.is_vice_captain && <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-background bg-slate-200 text-[7px] font-black text-slate-700 md:h-4 md:w-4 md:text-[8px]">V</span>}
+          {pick.is_captain && <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full border border-background bg-amber-400 text-[9px] font-black text-amber-950 md:h-[18px] md:w-[18px] md:text-[10px]">C</span>}
+          {!pick.is_captain && pick.is_vice_captain && <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full border border-background bg-sky-500 text-[8px] font-black text-white md:h-[18px] md:w-[18px] md:text-[9px]">V</span>}
           {isAutoSubOut && <span className="absolute -left-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-background bg-rose-500 text-white md:h-4 md:w-4"><ArrowDown className="h-2.5 w-2.5 md:h-3 md:w-3" /></span>}
         </span>
-        <span className={`mt-px flex w-full max-w-12 flex-col items-center justify-center gap-0 rounded-md border px-1 py-px text-[7px] font-bold leading-[1.25] shadow-sm backdrop-blur max-[349px]:max-w-9 max-[349px]:px-0.5 max-[349px]:text-[6px] min-[350px]:mt-0.5 min-[350px]:max-w-14 min-[350px]:py-0.5 min-[350px]:text-[8px] min-[400px]:max-w-[70px] min-[400px]:text-[10px] sm:mt-1 sm:max-w-[82px] sm:px-1.5 sm:py-1 sm:text-[10px] md:mt-1.5 md:max-w-[106px] md:px-2 md:py-1.5 md:text-[11px] lg:max-w-[124px] lg:px-2.5 lg:py-2 lg:text-xs ${isAutoSubOut ? "border-rose-300 bg-rose-50/95 text-rose-700 dark:border-rose-700 dark:bg-rose-950/95 dark:text-rose-200" : "border-background/70 bg-background/95 text-foreground"}`}>
+        <span className={`flex w-full max-w-[70px] flex-col items-center justify-center gap-0 rounded-md border px-1 py-px text-[10px] font-bold leading-[1.25] shadow-sm backdrop-blur sm:max-w-[82px] sm:px-1.5 sm:py-1 md:max-w-[106px] md:px-2 md:py-1.5 md:text-[11px] lg:max-w-[124px] lg:px-2.5 lg:py-2 lg:text-xs ${isAutoSubOut ? "border-rose-300 bg-rose-50/95 text-rose-700 dark:border-rose-700 dark:bg-rose-950/95 dark:text-rose-200" : "border-background/70 bg-background/95 text-foreground"}`}>
           <span className="min-w-0 w-full truncate text-center">{getShortName(pick.elementName)}</span>
           <span className={`shrink-0 font-mono leading-none ${isUpcoming ? "text-amber-600 dark:text-amber-400" : points >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-rose-600"}`}>
             {isUpcoming ? "--" : points}
@@ -215,7 +215,7 @@ export const ManagerAccordionList = ({
     return (
       <section aria-label={`Sơ đồ sân đấu của ${entry.teamName}`} className="space-y-3">
         <div className="overflow-hidden rounded-2xl border border-emerald-950/20 bg-emerald-950 shadow-inner">
-          <div className="relative aspect-[1417/788] min-h-[320px] w-full overflow-hidden min-[400px]:min-h-[330px] sm:min-h-[360px]">
+          <div className="relative aspect-[1417/788] min-h-[340px] w-full overflow-hidden sm:min-h-[360px]">
             <Image
               src="/pitch-graphic.svg"
               alt="Sân bóng"
@@ -227,7 +227,7 @@ export const ManagerAccordionList = ({
             <div className="absolute inset-x-2 top-5 z-20 flex items-center justify-between text-[9px] font-bold uppercase tracking-[0.12em] text-white/80 sm:inset-x-4 sm:top-3 sm:text-[10px]">
               <span className="rounded-full bg-black/20 px-1.5 py-0.5 backdrop-blur">Sơ đồ {getFormation(starters)}</span>
             </div>
-            <div className="absolute inset-x-[3%] bottom-[5%] top-[3%] z-10 grid grid-rows-4">
+            <div className="absolute inset-x-[3%] bottom-[5%] top-[5%] z-10 grid grid-rows-4 gap-4">
               {PITCH_ROW_LAYOUTS.map((row) => {
                 const players = starters.filter(
                   (pick) => (pick.element_type ?? 4) === row.elementType,
@@ -269,13 +269,13 @@ export const ManagerAccordionList = ({
                     title={`${pick.elementName ?? "Cầu thủ"} — chạm để xem chi tiết`}
                     className={`fpl-player-card group flex min-w-0 flex-col items-center rounded-lg border p-1 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/90 sm:rounded-xl sm:p-1.5 ${isAutoSubIn ? "border-emerald-300 bg-emerald-400/20" : "border-white/25 bg-emerald-900/45"}`}
                   >
-                    <span className="relative h-6 w-6 shrink-0 max-[349px]:h-5 max-[349px]:w-5 min-[400px]:h-8 min-[400px]:w-8 sm:h-10 sm:w-10 md:h-12 md:w-12">
-                      <span className="block h-full w-full overflow-hidden rounded-full border-2 border-background/90 bg-muted shadow-sm">
+                    <span className="relative h-12 w-12 shrink-0 md:h-12 md:w-12">
+                      <span className="block h-full w-full overflow-hidden rounded-full border-1 border-background/90 bg-muted shadow-sm">
                         <PlayerAvatar avatar={pick.avatar} name={pick.elementName} className="h-full w-full" />
                       </span>
                     <span className={`absolute -bottom-1 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full border border-emerald-950 px-0.5 text-[7px] font-black text-white ${position.className}`}>{position.label}</span>
                     </span>
-                    <span className="mt-1 flex w-full min-w-0 flex-col items-center rounded-md bg-background/95 px-0.5 py-0.5 text-[7px] font-bold leading-none text-foreground sm:text-[9px]">
+                    <span className="flex w-full min-w-0 flex-col items-center rounded-md bg-background/95 px-0.5 py-0.5 text-[10px] font-bold leading-none text-foreground md:text-[11px] lg:text-xs">
                       <span className="w-full truncate">{getShortName(pick.elementName)}</span>
                       <span className={`mt-0.5 flex items-center gap-0.5 font-mono ${isUpcoming ? "text-amber-600 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"}`}>
                         {isAutoSubIn && <ArrowUp className="h-2 w-2" />}
