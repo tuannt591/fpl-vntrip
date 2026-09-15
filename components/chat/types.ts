@@ -6,6 +6,7 @@ export type AuthSessionProfile = {
 };
 
 export type AuthSessionManager = {
+  entryId: number;
   managerAvatar: string | null;
 };
 

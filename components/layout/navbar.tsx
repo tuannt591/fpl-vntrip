@@ -52,7 +52,12 @@ export const Navbar = ({
 
         // New sessions already contain this display data. Retain the endpoint
         // only as a one-time migration path for sessions stored before it.
-        if (session.profile || fallbackRequestTokenRef.current === session.token) {
+        if (
+          (session.profile &&
+            (session.manager === null ||
+              typeof session.manager?.entryId === "number")) ||
+          fallbackRequestTokenRef.current === session.token
+        ) {
           return;
         }
         fallbackRequestTokenRef.current = session.token;
@@ -85,10 +90,16 @@ export const Navbar = ({
     const handleManagerClaimed = (event: Event) => {
       if (!session) return;
 
-      const { managerAvatar } = (
-        event as CustomEvent<{ managerAvatar?: string | null }>
+      const { entryId, managerAvatar } = (
+        event as CustomEvent<{
+          entryId?: number;
+          managerAvatar?: string | null;
+        }>
       ).detail;
-      const manager = { managerAvatar: managerAvatar || null };
+      const manager = {
+        entryId: entryId ?? session.manager?.entryId ?? 0,
+        managerAvatar: managerAvatar || null,
+      };
 
       setFallbackManager(manager);
       saveSession({ ...session, manager });

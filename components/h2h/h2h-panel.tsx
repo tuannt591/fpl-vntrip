@@ -208,7 +208,10 @@ export function H2HPanel() {
       setClaimDialogOpen(false);
       window.dispatchEvent(
         new CustomEvent("fpl-vntrip:manager-claimed", {
-          detail: { managerAvatar: responseData.manager.managerAvatar },
+          detail: {
+            entryId: responseData.manager.entryId,
+            managerAvatar: responseData.manager.managerAvatar,
+          },
         }),
       );
       router.refresh();

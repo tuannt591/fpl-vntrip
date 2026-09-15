@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ManagerAccordionList } from './ui/manager-accordion-list';
 import { ManagerLeagueLeaderboard } from './manager-league-leaderboard';
+import { useAuthSession } from "@/components/auth/auth-session-provider";
 import { Button } from './ui/button';
 import {
   FantasyLeaderboardContentSkeleton,
@@ -328,6 +329,7 @@ function runComebackSimulation(teams: TeamLiveScenario[], trials = 10_000): Come
 }
 
 export const FantasyLeaderboard = () => {
+  const { session } = useAuthSession();
   const currentLeagueId = VNTRIP_LEAGUE_ID;
   const initialData = getCachedFantasyLeaderboardData(
     currentLeagueId,
@@ -786,6 +788,7 @@ export const FantasyLeaderboard = () => {
                 <ManagerLeagueLeaderboard
                   managers={leaderboardData}
                   currentGameweek={currentGW}
+                  myEntryId={session?.manager?.entryId}
                 />
               )}
             </>

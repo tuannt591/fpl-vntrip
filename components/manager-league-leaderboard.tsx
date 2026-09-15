@@ -6,20 +6,17 @@ import type { LeaderboardEntry } from "@/types/fantasy";
 type ManagerLeagueLeaderboardProps = {
   managers: LeaderboardEntry[];
   currentGameweek: number;
+  myEntryId?: number;
 };
 
 function getRankClass(rank: number, isLast: boolean) {
   if (rank === 1) return "bg-amber-400/20 text-amber-800 ring-1 ring-amber-500/25 dark:text-amber-200";
-  if (rank === 2) return "bg-slate-400/15 text-slate-700 ring-1 ring-slate-400/25 dark:text-slate-200";
-  if (rank === 3) return "bg-orange-500/15 text-orange-800 ring-1 ring-orange-500/25 dark:text-orange-200";
   if (isLast) return "bg-rose-500/15 text-rose-700 ring-1 ring-rose-500/25 dark:text-rose-300";
   return "bg-muted text-muted-foreground";
 }
 
 function getRowClass(rank: number, isLast: boolean) {
   if (rank === 1) return "border-l-2 border-l-amber-500 bg-amber-500/[0.07] dark:bg-amber-500/[0.1]";
-  if (rank === 2) return "border-l-2 border-l-slate-400 bg-slate-500/[0.06] dark:bg-slate-400/[0.08]";
-  if (rank === 3) return "border-l-2 border-l-orange-500 bg-orange-500/[0.07] dark:bg-orange-500/[0.1]";
   if (isLast) return "border-l-2 border-l-rose-500 bg-rose-500/[0.06] dark:bg-rose-500/[0.1]";
   return "";
 }
@@ -27,6 +24,7 @@ function getRowClass(rank: number, isLast: boolean) {
 export function ManagerLeagueLeaderboard({
   managers,
   currentGameweek,
+  myEntryId,
 }: ManagerLeagueLeaderboardProps) {
   const rankedManagers = [...managers].sort(
     (first, second) => first.leagueRank - second.leagueRank,
@@ -59,22 +57,24 @@ export function ManagerLeagueLeaderboard({
         <div role="table" aria-label="Bảng xếp hạng manager theo tổng điểm">
           <div
             role="row"
-            className="grid grid-cols-[34px_minmax(0,1fr)_56px_44px] items-center gap-2 border-b bg-muted/20 px-3 py-2 text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground sm:grid-cols-[42px_minmax(0,1fr)_76px_64px] sm:px-4 sm:text-[10px]"
+            className="grid grid-cols-[34px_minmax(0,1fr)_44px_56px] items-center gap-2 border-b bg-muted/20 px-3 py-2 text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground sm:grid-cols-[42px_minmax(0,1fr)_64px_76px] sm:px-4 sm:text-[10px]"
           >
             <span>Hạng</span>
             <span>Manager</span>
-            <span className="text-right">Total</span>
             <span className="text-right">GW</span>
+            <span className="text-right">Total</span>
           </div>
 
           {rankedManagers.map((manager, index) => {
             const isLast = index === rankedManagers.length - 1;
+            const isMe = myEntryId === manager.entry;
 
             return (
               <div
                 key={manager.entry}
                 role="row"
-                className={`grid min-h-[61px] grid-cols-[34px_minmax(0,1fr)_56px_44px] items-center gap-2 border-b px-3 py-2.5 last:border-b-0 sm:grid-cols-[42px_minmax(0,1fr)_76px_64px] sm:px-4 ${getRowClass(manager.leagueRank, isLast)}`}
+                aria-label={isMe ? `${manager.teamName}, manager của bạn` : undefined}
+                className={`grid min-h-[61px] grid-cols-[34px_minmax(0,1fr)_44px_56px] items-center gap-2 border-b px-3 py-2.5 last:border-b-0 sm:grid-cols-[42px_minmax(0,1fr)_64px_76px] sm:px-4 ${isMe ? "border-l-2 border-l-primary bg-primary/10 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.2)]" : getRowClass(manager.leagueRank, isLast)}`}
               >
               <span
                 className={`flex h-7 w-7 items-center justify-center rounded-lg font-mono text-[10px] font-black sm:h-8 sm:w-8 sm:text-xs ${getRankClass(manager.leagueRank, isLast)}`}
@@ -102,16 +102,23 @@ export function ManagerLeagueLeaderboard({
                   </span>
                 )}
                 <div className="min-w-0">
-                  <p className="truncate text-xs font-semibold sm:text-sm">{manager.teamName}</p>
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <p className="truncate text-xs font-semibold sm:text-sm">{manager.teamName}</p>
+                    {isMe && (
+                      <span className="shrink-0 rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-primary-foreground">
+                        Bạn
+                      </span>
+                    )}
+                  </div>
                   <p className="truncate text-[10px] text-muted-foreground sm:text-xs">{manager.manager}</p>
                 </div>
               </div>
 
-              <p className="text-right font-mono text-sm font-black tracking-tight text-emerald-700 dark:text-emerald-400 sm:text-base">
-                {manager.totalPoint.toLocaleString()}
-              </p>
               <p className="text-right font-mono text-xs font-bold text-foreground sm:text-sm">
                 {manager.eventTotal.toLocaleString()}
+              </p>
+              <p className="text-right font-mono text-sm font-black tracking-tight text-emerald-700 dark:text-emerald-400 sm:text-base">
+                {manager.totalPoint.toLocaleString()}
               </p>
               </div>
             );
