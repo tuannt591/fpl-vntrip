@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -12,8 +12,8 @@ interface ManagerAccordionListProps {
 
 type SquadView = "list" | "pitch";
 
-const PLAYER_PHOTO_BASE_URL = "https://resources.premierleague.com/premierleague25/photos/players/110x140";
-const PLAYER_AVATAR_SIZES = "(max-width: 399px) 24px, (max-width: 639px) 32px, (max-width: 767px) 40px, (max-width: 1023px) 48px, 56px";
+const PLAYER_PHOTO_BASE_URL = "https://resources.premierleague.com/premierleague25/photos/players/500x500";
+const PLAYER_AVATAR_SIZES = "(max-width: 399px) 48px, (max-width: 639px) 64px, (max-width: 767px) 80px, (max-width: 1023px) 96px, 112px";
 
 type PitchRowLayout = {
   elementType: number;
@@ -49,18 +49,40 @@ function getPitchRowGridClass(playerCount: number) {
   return "grid-cols-5 gap-x-[clamp(0.25rem,1.25vw,1rem)]";
 }
 
+// Module-level cache: tracks avatar URLs that have already been successfully
+// loaded during this session. When PlayerAvatar remounts (e.g. accordion
+// toggle), it can skip the fade-in animation and show the image immediately.
+const loadedAvatarCache = new Set<string>();
+const errorAvatarCache = new Set<string>();
+
 function PlayerAvatar({
   avatar,
   name,
   className,
+  sizes: sizesProp,
 }: {
   avatar?: string;
   name?: string;
   className?: string;
+  sizes?: string;
 }) {
-  const [hasImageError, setHasImageError] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const sizes = sizesProp ?? PLAYER_AVATAR_SIZES;
   const src = avatar ? `${PLAYER_PHOTO_BASE_URL}/${avatar}` : null;
+  const alreadyLoaded = src ? loadedAvatarCache.has(src) : false;
+  const alreadyErrored = src ? errorAvatarCache.has(src) : false;
+
+  const [hasImageError, setHasImageError] = useState(alreadyErrored);
+  const [isLoaded, setIsLoaded] = useState(alreadyLoaded);
+
+  const handleLoad = useCallback(() => {
+    if (src) loadedAvatarCache.add(src);
+    setIsLoaded(true);
+  }, [src]);
+
+  const handleError = useCallback(() => {
+    if (src) errorAvatarCache.add(src);
+    setHasImageError(true);
+  }, [src]);
 
   return (
     <span className={`relative block ${className ?? ""}`}>
@@ -68,8 +90,8 @@ function PlayerAvatar({
         src="/placeholder.png"
         alt=""
         fill
-        sizes={PLAYER_AVATAR_SIZES}
-        className={`object-contain object-top transition-opacity duration-200 ${src && isLoaded && !hasImageError ? "opacity-0" : "opacity-100"}`}
+        sizes={sizes}
+        className={`object-cover object-bottom transition-opacity duration-200 ${src && isLoaded && !hasImageError ? "opacity-0" : "opacity-100"}`}
         aria-hidden="true"
       />
       {src && !hasImageError && (
@@ -77,11 +99,11 @@ function PlayerAvatar({
           src={src}
           alt={name ? `Ảnh ${name}` : ""}
           fill
-          sizes={PLAYER_AVATAR_SIZES}
-          className={`object-contain object-top transition-opacity duration-200 ${isLoaded ? "opacity-100" : "opacity-0"}`}
+          sizes={sizes}
+          className={`object-cover object-bottom transition-opacity duration-200 ${isLoaded ? "opacity-100" : "opacity-0"}`}
           loading="lazy"
-          onLoad={() => setIsLoaded(true)}
-          onError={() => setHasImageError(true)}
+          onLoad={handleLoad}
+          onError={handleError}
         />
       )}
     </span>
@@ -332,7 +354,7 @@ export const ManagerAccordionList = ({
 
           <section className="fpl-player-detail-hero relative shrink-0 overflow-hidden border-b bg-gradient-to-br from-primary/15 via-primary/[0.06] to-transparent px-4 pb-4 pt-5 sm:min-h-[134px] sm:px-6 sm:py-6">
             <div className="absolute -right-10 -top-14 h-36 w-36 rounded-full bg-primary/10 blur-2xl" />
-            <div className="relative grid grid-cols-[64px_minmax(0,1fr)] gap-x-3 gap-y-3 sm:grid-cols-[68px_minmax(0,1fr)_auto] sm:items-center sm:gap-4 sm:pr-10">
+            <div className="relative grid grid-cols-[112px_minmax(0,1fr)] gap-x-3 gap-y-3 sm:grid-cols-[128px_minmax(0,1fr)_auto] sm:items-center sm:gap-4 sm:pr-10">
               <button
                 type="button"
                 onClick={() => setSelectedAvatar({
@@ -341,7 +363,7 @@ export const ManagerAccordionList = ({
                     : "/placeholder.png",
                   name: elementName,
                 })}
-                className="group relative flex h-20 w-16 items-center justify-center overflow-hidden rounded-2xl border border-background/80 bg-background/70 shadow-sm transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:h-[86px] sm:w-[68px]"
+                className="relative h-[140px] w-28 overflow-hidden rounded-2xl border border-background/80 bg-background/70 shadow-sm transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:h-[160px] sm:w-32"
                 aria-label={`Phóng to ảnh ${elementName}`}
                 title="Phóng to ảnh"
               >
@@ -349,8 +371,8 @@ export const ManagerAccordionList = ({
                   avatar={avatar}
                   name={elementName}
                   className="h-full w-full"
+                  sizes="(max-width: 639px) 112px, 128px"
                 />
-                <span className="absolute inset-x-0 bottom-0 bg-black/45 py-1 text-[9px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">Xem ảnh</span>
               </button>
 
               <div className="min-w-0 self-center pr-10 sm:pr-0">
@@ -448,18 +470,19 @@ export const ManagerAccordionList = ({
         <DialogContent className="max-h-[88dvh] w-[min(92vw,28rem)] max-w-none overflow-visible border-0 bg-transparent p-0 shadow-none [&>button]:right-2 [&>button]:top-2 [&>button]:rounded-full [&>button]:bg-background/90 [&>button]:p-1 [&>button]:shadow-sm">
           {selectedAvatar && (
             <div className="flex flex-col items-center gap-3">
-              <Image
-                src={selectedAvatar.src}
-                alt={selectedAvatar.name}
-                width={440}
-                height={560}
-                sizes="(max-width: 640px) 92vw, 440px"
-                className="max-h-[78dvh] w-auto max-w-full rounded-3xl object-contain shadow-2xl"
-                onError={() => setSelectedAvatar((current) => current
-                  ? { ...current, src: "/placeholder.png" }
-                  : current)}
-                priority
-              />
+              <div className="relative aspect-[110/140] w-[min(92vw,28rem)] max-h-[78dvh] overflow-hidden rounded-3xl bg-black/20 shadow-2xl">
+                <Image
+                  src={selectedAvatar.src}
+                  alt={selectedAvatar.name}
+                  fill
+                  sizes="(max-width: 640px) 92vw, 440px"
+                  className="object-contain"
+                  onError={() => setSelectedAvatar((current) => current
+                    ? { ...current, src: "/placeholder.png" }
+                    : current)}
+                  priority
+                />
+              </div>
               <p className="text-sm font-semibold text-white drop-shadow-lg">{selectedAvatar.name}</p>
             </div>
           )}
