@@ -509,7 +509,7 @@ export const ManagerAccordionList = ({
                 (pick) => pick.element === outPlayer.autoSubPartnerElement,
               ),
             }));
-          const squadView = squadViews[entry.entry] ?? "pitch";
+          const squadView = squadViews[entry.entry] ?? "list";
 
           return (
             <AccordionItem
