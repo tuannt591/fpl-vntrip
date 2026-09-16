@@ -1,12 +1,20 @@
+"use client";
+
 import Image from "next/image";
+import { useState } from "react";
 import { Trophy } from "lucide-react";
 
-import type { LeaderboardEntry } from "@/types/fantasy";
+import { ManagerGameweekStats } from "@/components/manager-gameweek-stats";
+import type {
+  LeaderboardEntry,
+  ManagerGameweekStatsData,
+} from "@/types/fantasy";
 
 type ManagerLeagueLeaderboardProps = {
   managers: LeaderboardEntry[];
   currentGameweek: number;
   myEntryId?: number;
+  managerGameweekStats?: ManagerGameweekStatsData | null;
 };
 
 function getRankClass(rank: number, isLast: boolean) {
@@ -25,31 +33,66 @@ export function ManagerLeagueLeaderboard({
   managers,
   currentGameweek,
   myEntryId,
+  managerGameweekStats,
 }: ManagerLeagueLeaderboardProps) {
+  const [view, setView] = useState<"standings" | "gameweek-stats">("standings");
   const rankedManagers = [...managers].sort(
     (first, second) => first.leagueRank - second.leagueRank,
   );
+  const gameweekRange = managerGameweekStats?.toGameweek
+    ? `GW ${managerGameweekStats.fromGameweek}–${managerGameweekStats.toGameweek}`
+    : "Chưa có Gameweek hoàn tất";
 
   return (
     <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-      <div className="flex items-center justify-between gap-3 border-b bg-muted/25 px-3 py-3 sm:px-4">
+      <div className="flex flex-col gap-3 border-b bg-muted/25 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
             <Trophy className="h-4 w-4" aria-hidden />
           </span>
           <div className="min-w-0">
-            <h2 className="text-sm font-black tracking-tight sm:text-base">Bảng xếp hạng manager</h2>
+            <h2 className="text-sm font-black tracking-tight sm:text-base">Managers</h2>
             <p className="truncate text-[10px] text-muted-foreground sm:text-xs">
-              Theo tổng điểm mùa · {rankedManagers.length} manager
+              {view === "standings"
+                ? `Theo tổng điểm mùa · ${rankedManagers.length} manager · GW ${currentGameweek}`
+                : `Nhất và Bét tuần · ${gameweekRange}`}
             </p>
           </div>
         </div>
-        <span className="shrink-0 rounded-lg bg-background px-2 py-1 font-mono text-[10px] font-bold text-muted-foreground shadow-sm sm:text-xs">
-          GW {currentGameweek}
-        </span>
+        <div
+          role="tablist"
+          aria-label="Chế độ xem manager"
+          className="grid w-full shrink-0 grid-cols-2 rounded-xl bg-muted p-1 text-[11px] font-bold sm:w-auto"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "standings"}
+            onClick={() => setView("standings")}
+            className={`rounded-lg px-2.5 py-1.5 transition-colors ${view === "standings" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Bảng xếp hạng
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "gameweek-stats"}
+            onClick={() => setView("gameweek-stats")}
+            className={`rounded-lg px-2.5 py-1.5 transition-colors ${view === "gameweek-stats" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Thống kê Gameweek
+          </button>
+        </div>
       </div>
 
-      {rankedManagers.length === 0 ? (
+      {view === "gameweek-stats" ? (
+        <ManagerGameweekStats
+          embedded
+          managers={managers}
+          stats={managerGameweekStats}
+          myEntryId={myEntryId}
+        />
+      ) : rankedManagers.length === 0 ? (
         <p className="px-4 py-10 text-center text-sm text-muted-foreground">
           Chưa có dữ liệu manager.
         </p>

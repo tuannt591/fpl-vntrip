@@ -157,3 +157,25 @@ export type TeamWeeklyData = {
   totalGW: number;
   winLossStartGW: number;
 };
+
+export type ManagerGameweekScore = {
+  gameweek: number;
+  points: number;
+  shared: boolean;
+};
+
+export type ManagerGameweekStat = {
+  entry: number;
+  firstWeeks: ManagerGameweekScore[];
+  lastWeeks: ManagerGameweekScore[];
+  highestScore: number | null;
+  highestScoreWeeks: ManagerGameweekScore[];
+  lowestScore: number | null;
+  lowestScoreWeeks: ManagerGameweekScore[];
+};
+
+export type ManagerGameweekStatsData = {
+  fromGameweek: number;
+  toGameweek: number;
+  managers: ManagerGameweekStat[];
+};

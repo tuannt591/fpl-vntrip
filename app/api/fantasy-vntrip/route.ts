@@ -1,4 +1,9 @@
-import { PlayerMatchStatus } from '@/types/fantasy';
+import {
+  PlayerMatchStatus,
+  type ManagerGameweekScore,
+  type ManagerGameweekStat,
+  type ManagerGameweekStatsData,
+} from '@/types/fantasy';
 import { FPL_API_BASE, TEAMS_CONFIG, WIN_LOSS_START_GW, EXCLUDED_ENTRIES, CACHE_DURATION, MANAGER_AVATARS } from '@/lib/fpl-config';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -94,6 +99,138 @@ async function getWeeklyTeamResults(currentEvent: number): Promise<any> {
   }
 }
 
+let cachedManagerGameweekStats: {
+  cacheKey: string;
+  data: ManagerGameweekStatsData;
+  fetchedAt: number;
+} | null = null;
+
+function getNetGameweekPoints(history: any): Map<number, number> {
+  const pointsByGameweek = new Map<number, number>();
+
+  for (const event of history?.current ?? []) {
+    const gameweek = Number(event?.event);
+    const points = Number(event?.points);
+    const transferCost = Number(event?.event_transfers_cost ?? 0);
+    if (
+      Number.isSafeInteger(gameweek) &&
+      gameweek > 0 &&
+      Number.isFinite(points) &&
+      Number.isFinite(transferCost)
+    ) {
+      pointsByGameweek.set(gameweek, points - transferCost);
+    }
+  }
+
+  return pointsByGameweek;
+}
+
+async function getManagerGameweekStats(
+  leagueEntries: any[],
+  completedGameweek: number,
+): Promise<ManagerGameweekStatsData> {
+  const entryIds = leagueEntries
+    .map((entry) => Number(entry?.entry))
+    .filter(
+      (entryId, index, source): entryId is number =>
+        Number.isSafeInteger(entryId) &&
+        entryId > 0 &&
+        !EXCLUDED_ENTRIES.includes(entryId) &&
+        source.indexOf(entryId) === index,
+    );
+  const cacheKey = `${completedGameweek}:${entryIds.join(',')}`;
+  const now = Date.now();
+
+  if (
+    cachedManagerGameweekStats?.cacheKey === cacheKey &&
+    now - cachedManagerGameweekStats.fetchedAt < CACHE_DURATION
+  ) {
+    return cachedManagerGameweekStats.data;
+  }
+
+  const histories = await Promise.all(
+    entryIds.map(async (entryId) => [entryId, await getEntryHistory(entryId)] as const),
+  );
+  const scoresByEntry = new Map(
+    histories.map(([entryId, history]) => [entryId, getNetGameweekPoints(history)]),
+  );
+  const scoresByManager = new Map<number, ManagerGameweekScore[]>();
+  const firstWeeksByManager = new Map<number, ManagerGameweekScore[]>();
+  const lastWeeksByManager = new Map<number, ManagerGameweekScore[]>();
+
+  entryIds.forEach((entryId) => {
+    scoresByManager.set(entryId, []);
+    firstWeeksByManager.set(entryId, []);
+    lastWeeksByManager.set(entryId, []);
+  });
+
+  for (let gameweek = 1; gameweek <= completedGameweek; gameweek += 1) {
+    const weeklyScores = entryIds.flatMap((entryId) => {
+      const points = scoresByEntry.get(entryId)?.get(gameweek);
+      return points === undefined ? [] : [{ entryId, points }];
+    });
+
+    if (weeklyScores.length === 0) continue;
+
+    const highestPoints = Math.max(...weeklyScores.map((item) => item.points));
+    const lowestPoints = Math.min(...weeklyScores.map((item) => item.points));
+    const topCount = weeklyScores.filter((item) => item.points === highestPoints).length;
+    const bottomCount = weeklyScores.filter((item) => item.points === lowestPoints).length;
+
+    weeklyScores.forEach(({ entryId, points }) => {
+      const score: ManagerGameweekScore = {
+        gameweek,
+        points,
+        shared:
+          (points === highestPoints && topCount > 1) ||
+          (points === lowestPoints && bottomCount > 1),
+      };
+      scoresByManager.get(entryId)?.push(score);
+
+      // A full-league tie should not count as both Nhất tuần and Bét tuần.
+      if (highestPoints === lowestPoints) return;
+
+      if (points === highestPoints) {
+        firstWeeksByManager.get(entryId)?.push(score);
+      }
+      if (points === lowestPoints) {
+        lastWeeksByManager.get(entryId)?.push(score);
+      }
+    });
+  }
+
+  const managers: ManagerGameweekStat[] = entryIds.map((entryId) => {
+    const scores = scoresByManager.get(entryId) ?? [];
+    const highestScore = scores.length ? Math.max(...scores.map((score) => score.points)) : null;
+    const lowestScore = scores.length ? Math.min(...scores.map((score) => score.points)) : null;
+
+    return {
+      entry: entryId,
+      firstWeeks: firstWeeksByManager.get(entryId) ?? [],
+      lastWeeks: lastWeeksByManager.get(entryId) ?? [],
+      highestScore,
+      highestScoreWeeks:
+        highestScore === null
+          ? []
+          : scores.filter((score) => score.points === highestScore),
+      lowestScore,
+      lowestScoreWeeks:
+        lowestScore === null
+          ? []
+          : scores.filter((score) => score.points === lowestScore),
+    };
+  });
+
+  const data = {
+    fromGameweek: 1,
+    toGameweek: completedGameweek,
+    managers,
+  };
+  cachedManagerGameweekStats = { cacheKey, data, fetchedAt: now };
+
+  return data;
+}
+
 
 let cachedBootstrapData: any = null;
 let lastFetchTime: number = 0;
@@ -127,6 +264,7 @@ async function getBootstrapData(): Promise<any> {
         currentEvent: currentEvent ? currentEvent.id : 1,
         elements: data.elements,
         teams: data.teams,
+        events: data.events,
       };
 
       cachedBootstrapData = finalResult;
@@ -137,8 +275,8 @@ async function getBootstrapData(): Promise<any> {
   } catch (error) {
     console.error('[API] Error fetching bootstrap-static:', error);
   }
-  
-  return cachedBootstrapData || { currentEvent: 1, elements: [], teams: [] }; // fallback
+
+  return cachedBootstrapData || { currentEvent: 1, elements: [], teams: [], events: [] }; // fallback
 }
 
 async function getElementLiveByEventId(eventId: number): Promise<any> {
@@ -168,28 +306,47 @@ async function getElementLiveByEventId(eventId: number): Promise<any> {
 
 async function getLeagueData(leagueId: string, phase: string): Promise<any> {
   try {
-    const response = await fetch(
-      `${FPL_API_BASE}/leagues-classic/${leagueId}/standings/?page_standings=1&phase=${phase}`,
-      {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    let page = 1;
+    let hasNext = true;
+    let firstPageData: any = null;
+    const results: any[] = [];
+
+    while (hasNext && page <= 20) {
+      const response = await fetch(
+        `${FPL_API_BASE}/leagues-classic/${leagueId}/standings/?page_standings=${page}&phase=${phase}`,
+        {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          },
+          next: { revalidate: 60 },
         },
-        next: { revalidate: 60 },
-      },
-    );
+      );
 
-    console.log(`[API] leagues-classic/${leagueId} -> status: ${response.status}`);
+      console.log(`[API] leagues-classic/${leagueId} page=${page} -> status: ${response.status}`);
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const pageData = await response.json();
+      if (!firstPageData) firstPageData = pageData;
+      results.push(...(pageData?.standings?.results ?? []));
+      hasNext = pageData?.standings?.has_next === true;
+      page += 1;
     }
 
-    const leagueData = await response.json();
-
-    return leagueData;
+    if (!firstPageData) return null;
+    return {
+      ...firstPageData,
+      standings: {
+        ...firstPageData.standings,
+        results,
+        has_next: hasNext,
+      },
+    };
   } catch (error) {
     console.error(`[API] Error fetching league ${leagueId}:`, error);
   }
@@ -281,9 +438,8 @@ function calculateBonus(fixtures: any[], teams: any[]) {
     const teamHome = teams.find(t => t.id === fixture.team_h);
     const teamAway = teams.find(t => t.id === fixture.team_a);
 
-    const fixture_name = `${teamHome?.name || 'Unknown'} - ${
-      teamAway?.name || 'Unknown'
-    }`;
+    const fixture_name = `${teamHome?.name || 'Unknown'} - ${teamAway?.name || 'Unknown'
+      }`;
 
     const bpsStat = fixture.stats.find((s: any) => s.identifier === 'bps');
     if (!bpsStat) {
@@ -651,8 +807,8 @@ function calculateGWPoints(
   const validPicks = isBenchBoost
     ? picksWithAutoSub
     : picksWithAutoSub.filter(
-        (pick: any) => pick.position <= 11 || pick.isAutoSubIn,
-      );
+      (pick: any) => pick.position <= 11 || pick.isAutoSubIn,
+    );
 
   // Calculate total player points
   let gwPoint = validPicks.reduce((sum: number, pick: any) => {
@@ -690,7 +846,7 @@ export async function GET(request: NextRequest) {
   const gw = searchParams.get('gw') || '0';
 
   try {
-    const { currentEvent, elements, teams } = await getBootstrapData();
+    const { currentEvent, elements, teams, events } = await getBootstrapData();
     const eventID = gw && parseInt(gw) > 0 ? parseInt(gw) : currentEvent;
 
     console.log(`[API] Request: leagueId=${leagueId}, phase=${phase}, gw=${eventID}`);
@@ -725,6 +881,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const completedGameweek = (events ?? []).reduce(
+      (latestCompleted: number, event: any) =>
+        event?.finished === true && Number.isSafeInteger(event?.id)
+          ? Math.max(latestCompleted, event.id)
+          : latestCompleted,
+      0,
+    );
+    const managerGameweekStats = await getManagerGameweekStats(
+      leagueData.standings.results,
+      completedGameweek,
+    );
+
     const liveDataByElementId = new Map<number, any>(
       liveData.elements.map((element: any) => [element.id, element]),
     );
@@ -742,194 +910,194 @@ export async function GET(request: NextRequest) {
       leagueData.standings.results
         .filter((entry: any) => !EXCLUDED_ENTRIES.includes(entry.entry))
         .map(async (entry: any) => {
-        const entryId = entry.entry;
-        const picksData = await getPicksByEntryId(entryId, eventID);
-        if (!picksData) {
-          console.warn(`[API] picksData is null for entry ${entryId} — skipping`);
-          return null;
-        }
-        const activeChip = picksData.active_chip;
-        const transferCost = picksData.entry_history?.event_transfers_cost ?? 0;
-
-        // Get transfer list for player
-        const transfers = await getTransfersThisGW(
-          entryId,
-          eventID,
-          elements,
-          picksData,
-        );
-
-        const picksWithLive = picksData.picks.map((pick: any) => {
-          let live: any = null;
-          let elementName: string | undefined = undefined;
-          let avatar: string | undefined = undefined;
-          let clubName: string | undefined = undefined;
-          let elementType: number | undefined = undefined;
-          let player: any = null;
-
-          if (liveData) {
-            live = liveDataByElementId.get(pick.element) || null;
+          const entryId = entry.entry;
+          const picksData = await getPicksByEntryId(entryId, eventID);
+          if (!picksData) {
+            console.warn(`[API] picksData is null for entry ${entryId} — skipping`);
+            return null;
           }
-          if (elements) {
-            player = elementsById.get(pick.element) || null;
-            elementName = player ? player.web_name : undefined;
-            avatar = player ? `${player.code}.png` : undefined;
-            elementType = player ? player.element_type : undefined;
-            const team = player ? teamsById.get(player.team) : undefined;
-            clubName = team ? team.name : undefined;
-          }
+          const activeChip = picksData.active_chip;
+          const transferCost = picksData.entry_history?.event_transfers_cost ?? 0;
 
-          return {
-            ...pick,
-            elementName,
-            avatar,
-            clubName,
-            element_type: elementType,
-            explain: live?.explain ?? [],
-            stats: live?.stats ?? {},
-            projection: {
-              form: Number(player?.form) || 0,
-              pointsPerGame: Number(player?.points_per_game) || 0,
-              chanceOfPlaying:
-                typeof player?.chance_this_round === 'number'
-                  ? player.chance_this_round
-                  : null,
-            },
-          };
-        });
+          // Get transfer list for player
+          const transfers = await getTransfersThisGW(
+            entryId,
+            eventID,
+            elements,
+            picksData,
+          );
 
-        // 2. Merge bonus into explain array (after fixtureData is ready)
-        const picksWithBonus = picksWithLive.map((pick: any) => {
-          if (Array.isArray(pick.explain)) {
-            // 1️⃣ Update explain array with bonus
-            pick.explain = pick.explain.map((exp: any) => {
-              const fixture = fixturesById.get(String(exp.fixture));
+          const picksWithLive = picksData.picks.map((pick: any) => {
+            let live: any = null;
+            let elementName: string | undefined = undefined;
+            let avatar: string | undefined = undefined;
+            let clubName: string | undefined = undefined;
+            let elementType: number | undefined = undefined;
+            let player: any = null;
 
-              const match_status = getMatchStatus(fixture, exp);
-              const isFinished = fixture?.finished_provisional === true;
+            if (liveData) {
+              live = liveDataByElementId.get(pick.element) || null;
+            }
+            if (elements) {
+              player = elementsById.get(pick.element) || null;
+              elementName = player ? player.web_name : undefined;
+              avatar = player ? `${player.code}.png` : undefined;
+              elementType = player ? player.element_type : undefined;
+              const team = player ? teamsById.get(player.team) : undefined;
+              clubName = team ? team.name : undefined;
+            }
 
-              // Check if bonus already exists in exp.stats
-              const existingBonusStat = exp.stats.find(
-                (s: any) => s.identifier === 'bonus',
+            return {
+              ...pick,
+              elementName,
+              avatar,
+              clubName,
+              element_type: elementType,
+              explain: live?.explain ?? [],
+              stats: live?.stats ?? {},
+              projection: {
+                form: Number(player?.form) || 0,
+                pointsPerGame: Number(player?.points_per_game) || 0,
+                chanceOfPlaying:
+                  typeof player?.chance_this_round === 'number'
+                    ? player.chance_this_round
+                    : null,
+              },
+            };
+          });
+
+          // 2. Merge bonus into explain array (after fixtureData is ready)
+          const picksWithBonus = picksWithLive.map((pick: any) => {
+            if (Array.isArray(pick.explain)) {
+              // 1️⃣ Update explain array with bonus
+              pick.explain = pick.explain.map((exp: any) => {
+                const fixture = fixturesById.get(String(exp.fixture));
+
+                const match_status = getMatchStatus(fixture, exp);
+                const isFinished = fixture?.finished_provisional === true;
+
+                // Check if bonus already exists in exp.stats
+                const existingBonusStat = exp.stats.find(
+                  (s: any) => s.identifier === 'bonus',
+                );
+
+                // If match finished -> use bonus from API (if any)
+                // If match in progress -> calculate realtime bonus from BPS
+                let bonusToAdd: number | null = null;
+
+                if (isFinished) {
+                  // Match finished: dùng bonus từ live.stats (API chính thức)
+                  // Do NOT add to exp.stats because API already returns it
+                  // Official bonus will be calculated from live.stats.bonus
+                } else {
+                  // Match in progress: dùng realtime bonus từ BPS
+                  const realtimeBonus = fixture?.bonus[pick.element];
+                  if (realtimeBonus && !existingBonusStat) {
+                    bonusToAdd = realtimeBonus;
+                  }
+                }
+
+                if (bonusToAdd !== null) {
+                  return {
+                    match_status,
+                    ...fixture,
+                    ...exp,
+                    stats: [
+                      ...exp.stats,
+                      {
+                        identifier: 'bonus',
+                        points: bonusToAdd,
+                        value: bonusToAdd,
+                        points_modification: 0,
+                      },
+                    ],
+                  };
+                }
+
+                return { ...exp, ...fixture, match_status };
+              });
+
+              // 2️⃣ After merging bonus -> recalculate player total points
+              const explain = pick.explain ?? [];
+              const playerPointsFromExplain = calculatePlayerPoints(explain);
+              const bonusPointsFromExplain = calculateBonusPoints(explain);
+
+              // Check if any match has finished
+              const hasFinishedMatch = explain.some(
+                (exp: any) => exp.finished_provisional === true,
               );
 
-              // If match finished -> use bonus from API (if any)
-              // If match in progress -> calculate realtime bonus from BPS
-              let bonusToAdd: number | null = null;
+              // If a match finished -> prioritize bonus from API (pick.stats.bonus)
+              // If all matches in progress -> use realtime bonus from explain
+              const apiBonusPoints = pick.stats?.bonus ?? 0;
+              const finalBonusPoints = hasFinishedMatch
+                ? Math.max(apiBonusPoints, bonusPointsFromExplain) // Take the larger value to ensure no missing bonus
+                : bonusPointsFromExplain;
 
-              if (isFinished) {
-                // Match finished: dùng bonus từ live.stats (API chính thức)
-                // Do NOT add to exp.stats because API already returns it
-                // Official bonus will be calculated from live.stats.bonus
-              } else {
-                // Match in progress: dùng realtime bonus từ BPS
-                const realtimeBonus = fixture?.bonus[pick.element];
-                if (realtimeBonus && !existingBonusStat) {
-                  bonusToAdd = realtimeBonus;
-                }
-              }
+              // Total points = explain points + bonus (if not in explain)
+              const totalPoints = playerPointsFromExplain;
 
-              if (bonusToAdd !== null) {
-                return {
-                  match_status,
-                  ...fixture,
-                  ...exp,
-                  stats: [
-                    ...exp.stats,
-                    {
-                      identifier: 'bonus',
-                      points: bonusToAdd,
-                      value: bonusToAdd,
-                      points_modification: 0,
-                    },
-                  ],
-                };
-              }
+              // 3️⃣ Update live.stats
+              pick.stats = {
+                ...(pick.stats || {}),
+                bonus: finalBonusPoints,
+                total_points: totalPoints,
+              };
+            }
 
-              return { ...exp, ...fixture, match_status };
-            });
+            return pick;
+          });
 
-            // 2️⃣ After merging bonus -> recalculate player total points
-            const explain = pick.explain ?? [];
-            const playerPointsFromExplain = calculatePlayerPoints(explain);
-            const bonusPointsFromExplain = calculateBonusPoints(explain);
+          // Apply auto-sub logic to mark subbed-in players
+          // (Apply only when NOT using Bench Boost)
+          const isBenchBoost = activeChip === 'bboost';
+          const finalPicks = isBenchBoost
+            ? picksWithBonus.map((p: any) => ({ ...p, isAutoSubIn: false }))
+            : applyAutoSub(picksWithBonus, liveData);
 
-            // Check if any match has finished
-            const hasFinishedMatch = explain.some(
-              (exp: any) => exp.finished_provisional === true,
-            );
+          const picksDataWithLive = {
+            ...picksData,
+            picks: finalPicks,
+          };
 
-            // If a match finished -> prioritize bonus from API (pick.stats.bonus)
-            // If all matches in progress -> use realtime bonus from explain
-            const apiBonusPoints = pick.stats?.bonus ?? 0;
-            const finalBonusPoints = hasFinishedMatch
-              ? Math.max(apiBonusPoints, bonusPointsFromExplain) // Take the larger value to ensure no missing bonus
-              : bonusPointsFromExplain;
+          const gwPoint = calculateGWPoints(
+            picksWithBonus,
+            transferCost,
+            liveData,
+            activeChip,
+          );
 
-            // Total points = explain points + bonus (if not in explain)
-            const totalPoints = playerPointsFromExplain;
+          const team = getTeamByEntryId(entryId);
+          const playedInfo = calculatePlayed(
+            picksDataWithLive.picks,
+            liveData,
+            activeChip,
+          );
 
-            // 3️⃣ Update live.stats
-            pick.stats = {
-              ...(pick.stats || {}),
-              bonus: finalBonusPoints,
-              total_points: totalPoints,
-            };
-          }
-
-          return pick;
-        });
-
-        // Apply auto-sub logic to mark subbed-in players
-        // (Apply only when NOT using Bench Boost)
-        const isBenchBoost = activeChip === 'bboost';
-        const finalPicks = isBenchBoost
-          ? picksWithBonus.map((p: any) => ({ ...p, isAutoSubIn: false }))
-          : applyAutoSub(picksWithBonus, liveData);
-
-        const picksDataWithLive = {
-          ...picksData,
-          picks: finalPicks,
-        };
-
-        const gwPoint = calculateGWPoints(
-          picksWithBonus,
-          transferCost,
-          liveData,
-          activeChip,
-        );
-
-        const team = getTeamByEntryId(entryId);
-        const playedInfo = calculatePlayed(
-          picksDataWithLive.picks,
-          liveData,
-          activeChip,
-        );
-
-        return {
-          // Keep the official classic-league rank for the Managers tab. The
-          // legacy `rank` below is recalculated from live GW points for Teams.
-          leagueRank: entry.rank,
-          rank: entry.rank,
-          manager: entry.player_name,
-          teamName: entry.entry_name,
-          totalPoint: entry.total,
-          eventTotal: entry.event_total,
-          entry: entryId,
-          gwPoint,
-          team,
-          managerAvatar: MANAGER_AVATARS[entryId] || null,
-          playedInfo,
-          transfers,
-          activeChip,
-          entryHistory: {
-            transferCost: picksData.entry_history.event_transfers_cost,
-            bank: picksData.entry_history.bank,
-            value: picksData.entry_history.value,
-          },
-          picks: picksDataWithLive.picks,
-        };
-      }),
+          return {
+            // Keep the official classic-league rank for the Managers tab. The
+            // legacy `rank` below is recalculated from live GW points for Teams.
+            leagueRank: entry.rank,
+            rank: entry.rank,
+            manager: entry.player_name,
+            teamName: entry.entry_name,
+            totalPoint: entry.total,
+            eventTotal: entry.event_total,
+            entry: entryId,
+            gwPoint,
+            team,
+            managerAvatar: MANAGER_AVATARS[entryId] || null,
+            playedInfo,
+            transfers,
+            activeChip,
+            entryHistory: {
+              transferCost: picksData.entry_history.event_transfers_cost,
+              bank: picksData.entry_history.bank,
+              value: picksData.entry_history.value,
+            },
+            picks: picksDataWithLive.picks,
+          };
+        }),
     );
 
     // Filter out null entries (failed picks fetches)
@@ -944,6 +1112,7 @@ export async function GET(request: NextRequest) {
       leagueName: leagueData?.league.name || 'Unknown League',
       currentGW: currentEvent,
       teamWeeklyData,
+      managerGameweekStats,
     };
 
     return NextResponse.json(enhancedData, {

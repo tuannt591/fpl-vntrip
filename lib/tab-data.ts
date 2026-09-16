@@ -1,5 +1,9 @@
 import { loadClientData, readClientData, setClientData } from "@/lib/client-data-cache";
-import type { TeamWeeklyData, LeaderboardEntry } from "@/types/fantasy";
+import type {
+  TeamWeeklyData,
+  LeaderboardEntry,
+  ManagerGameweekStatsData,
+} from "@/types/fantasy";
 import type {
   AppProfile,
   ClaimedManager,
@@ -18,6 +22,7 @@ export type FantasyLeaderboardResponse = {
   entries: LeaderboardEntry[];
   currentGW: number;
   teamWeeklyData?: TeamWeeklyData | null;
+  managerGameweekStats?: ManagerGameweekStatsData | null;
   error?: string;
 };
 

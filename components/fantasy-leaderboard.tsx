@@ -19,6 +19,7 @@ import {
   TeamConfig,
   TeamStats,
   TeamWeeklyData,
+  ManagerGameweekStatsData,
   WeeklyTeamResult,
 } from '@/types/fantasy';
 import { VNTRIP_LEAGUE_ID, CURRENT_PHASE } from '@/lib/fpl-config';
@@ -350,6 +351,9 @@ export const FantasyLeaderboard = () => {
   const [teamWeeklyData, setTeamWeeklyData] = useState<TeamWeeklyData | null>(
     () => initialData?.teamWeeklyData ?? null,
   );
+  const [managerGameweekStats, setManagerGameweekStats] = useState<ManagerGameweekStatsData | null>(
+    () => initialData?.managerGameweekStats ?? null,
+  );
   const [selectedTeamDialog, setSelectedTeamDialog] = useState<string | null>(null);
   const [expandedTeamWeek, setExpandedTeamWeek] = useState<number | null>(null);
   const [isScenarioOpen, setIsScenarioOpen] = useState(false);
@@ -391,6 +395,7 @@ export const FantasyLeaderboard = () => {
       setCurrentGW(result.currentGW);
       setTeamStats(calculateTeamStats(result.entries));
       setTeamWeeklyData(result.teamWeeklyData ?? null);
+      setManagerGameweekStats(result.managerGameweekStats ?? null);
       setHasLoadedData(true);
     };
 
@@ -733,62 +738,63 @@ export const FantasyLeaderboard = () => {
 
               {activeTab === "teams" ? (
                 <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-                <div className="flex flex-col gap-2 border-b bg-muted/25 p-2 sm:flex-row sm:items-center sm:justify-between sm:px-3">
-                  <div
-                    role="tablist"
-                    aria-label="Lọc theo đội"
-                    className="relative grid grid-cols-3 rounded-xl bg-muted p-1 text-xs font-semibold"
-                  >
-                    <span
-                      aria-hidden
-                      className="pointer-events-none absolute bottom-1 left-1 top-1 rounded-lg bg-background shadow-sm transition-transform duration-300 ease-out motion-reduce:transition-none"
-                      style={{
-                        width: "calc((100% - 0.5rem) / 3)",
-                        transform: `translateX(${activeTeamFilterIndex * 100}%)`,
-                      }}
-                    />
-                    {TEAM_FILTERS.map(([filter, label]) => (
-                      <button
-                        key={filter}
-                        type="button"
-                        role="tab"
-                        aria-selected={teamFilter === filter}
-                        onClick={() => setTeamFilter(filter)}
-                        className={`relative z-10 h-8 rounded-lg px-3 transition-colors duration-200 motion-reduce:transition-none ${teamFilter === filter ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                  <label className="relative hidden w-full max-w-xs md:block">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      type="search"
-                      value={managerQuery}
-                      onChange={(event) => setManagerQuery(event.target.value)}
-                      placeholder="Tìm manager hoặc đội..."
-                      className="h-8 w-full rounded-xl border bg-background pl-8 pr-3 text-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/15"
-                    />
-                  </label>
-                </div>
-
-                <div className="relative">
-
-
-                  {filteredLeaderboardData.length === 0 ? (
-                    <div className="py-10 text-center text-sm text-muted-foreground">
-                      Không tìm thấy manager phù hợp.
+                  <div className="flex flex-col gap-2 border-b bg-muted/25 p-2 sm:flex-row sm:items-center sm:justify-between sm:px-3">
+                    <div
+                      role="tablist"
+                      aria-label="Lọc theo đội"
+                      className="relative grid grid-cols-3 rounded-xl bg-muted p-1 text-xs font-semibold"
+                    >
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute bottom-1 left-1 top-1 rounded-lg bg-background shadow-sm transition-transform duration-300 ease-out motion-reduce:transition-none"
+                        style={{
+                          width: "calc((100% - 0.5rem) / 3)",
+                          transform: `translateX(${activeTeamFilterIndex * 100}%)`,
+                        }}
+                      />
+                      {TEAM_FILTERS.map(([filter, label]) => (
+                        <button
+                          key={filter}
+                          type="button"
+                          role="tab"
+                          aria-selected={teamFilter === filter}
+                          onClick={() => setTeamFilter(filter)}
+                          className={`relative z-10 h-8 rounded-lg px-3 transition-colors duration-200 motion-reduce:transition-none ${teamFilter === filter ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                        >
+                          {label}
+                        </button>
+                      ))}
                     </div>
-                  ) : (
-                    <ManagerAccordionList managers={filteredLeaderboardData} />
-                  )}
-                </div>
+                    <label className="relative hidden w-full max-w-xs md:block">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        type="search"
+                        value={managerQuery}
+                        onChange={(event) => setManagerQuery(event.target.value)}
+                        placeholder="Tìm manager hoặc đội..."
+                        className="h-8 w-full rounded-xl border bg-background pl-8 pr-3 text-xs outline-none transition focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/15"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="relative">
+
+
+                    {filteredLeaderboardData.length === 0 ? (
+                      <div className="py-10 text-center text-sm text-muted-foreground">
+                        Không tìm thấy manager phù hợp.
+                      </div>
+                    ) : (
+                      <ManagerAccordionList managers={filteredLeaderboardData} />
+                    )}
+                  </div>
                 </section>
               ) : (
                 <ManagerLeagueLeaderboard
                   managers={leaderboardData}
                   currentGameweek={currentGW}
                   myEntryId={session?.manager?.entryId}
+                  managerGameweekStats={managerGameweekStats}
                 />
               )}
             </>
@@ -852,11 +858,11 @@ export const FantasyLeaderboard = () => {
 
                     return index === 1
                       ? [
-                          <span key="draw-chance" className="rounded-full border bg-background px-2 py-1 text-center text-[10px] font-bold text-muted-foreground">
-                            {Math.round(comebackAnalysis.drawChance * 100)}% hòa
-                          </span>,
-                          teamSummary,
-                        ]
+                        <span key="draw-chance" className="rounded-full border bg-background px-2 py-1 text-center text-[10px] font-bold text-muted-foreground">
+                          {Math.round(comebackAnalysis.drawChance * 100)}% hòa
+                        </span>,
+                        teamSummary,
+                      ]
                       : [teamSummary];
                   })}
                 </div>
@@ -1162,43 +1168,43 @@ export const FantasyLeaderboard = () => {
                                         </span>
                                       </header>
                                       <ul className="divide-y">
-                                      {team.members.map((member) => {
-                                        const manager = managersByEntryId.get(member.entryId);
-                                        const managerName = manager?.manager ?? `Manager #${member.entryId}`;
+                                        {team.members.map((member) => {
+                                          const manager = managersByEntryId.get(member.entryId);
+                                          const managerName = manager?.manager ?? `Manager #${member.entryId}`;
 
-                                        return (
-                                          <li key={member.entryId} className="grid min-w-0 grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-2 px-2.5 py-1.5">
-                                            {manager?.managerAvatar ? (
-                                              <Image
-                                                src={manager.managerAvatar}
-                                                alt={managerName}
-                                                width={24}
-                                                height={24}
-                                                unoptimized
-                                                className="h-6 w-6 rounded-full object-cover ring-1 ring-border"
-                                              />
-                                            ) : (
-                                              <span
-                                                aria-hidden="true"
-                                                className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[9px] font-black text-muted-foreground ring-1 ring-border"
-                                              >
-                                                {managerName.charAt(0).toLocaleUpperCase()}
+                                          return (
+                                            <li key={member.entryId} className="grid min-w-0 grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-2 px-2.5 py-1.5">
+                                              {manager?.managerAvatar ? (
+                                                <Image
+                                                  src={manager.managerAvatar}
+                                                  alt={managerName}
+                                                  width={24}
+                                                  height={24}
+                                                  unoptimized
+                                                  className="h-6 w-6 rounded-full object-cover ring-1 ring-border"
+                                                />
+                                              ) : (
+                                                <span
+                                                  aria-hidden="true"
+                                                  className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[9px] font-black text-muted-foreground ring-1 ring-border"
+                                                >
+                                                  {managerName.charAt(0).toLocaleUpperCase()}
+                                                </span>
+                                              )}
+                                              <span className="min-w-0">
+                                                <span className="block truncate text-[11px] font-semibold leading-tight text-foreground">
+                                                  {manager?.teamName ?? `Đội #${member.entryId}`}
+                                                </span>
+                                                <span className="mt-0.5 block truncate text-[9px] leading-none text-muted-foreground">
+                                                  {managerName}
+                                                </span>
                                               </span>
-                                            )}
-                                            <span className="min-w-0">
-                                              <span className="block truncate text-[11px] font-semibold leading-tight text-foreground">
-                                                {manager?.teamName ?? `Đội #${member.entryId}`}
+                                              <span className="min-w-7 rounded-md bg-muted px-1.5 py-0.5 text-center font-mono text-[10px] font-black text-foreground">
+                                                {member.points}
                                               </span>
-                                              <span className="mt-0.5 block truncate text-[9px] leading-none text-muted-foreground">
-                                                {managerName}
-                                              </span>
-                                            </span>
-                                            <span className="min-w-7 rounded-md bg-muted px-1.5 py-0.5 text-center font-mono text-[10px] font-black text-foreground">
-                                              {member.points}
-                                            </span>
-                                          </li>
-                                        );
-                                      })}
+                                            </li>
+                                          );
+                                        })}
                                       </ul>
                                     </section>
                                   );
