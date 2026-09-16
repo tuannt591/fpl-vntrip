@@ -2,9 +2,10 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { Trophy } from "lucide-react";
+import { ChevronRight, Trophy } from "lucide-react";
 
 import { ManagerGameweekStats } from "@/components/manager-gameweek-stats";
+import { ManagerWeeklyDetail } from "@/components/manager-weekly-detail";
 import type {
   LeaderboardEntry,
   ManagerGameweekStatsData,
@@ -36,6 +37,7 @@ export function ManagerLeagueLeaderboard({
   managerGameweekStats,
 }: ManagerLeagueLeaderboardProps) {
   const [view, setView] = useState<"standings" | "gameweek-stats">("standings");
+  const [selectedEntryId, setSelectedEntryId] = useState<number | null>(null);
   const rankedManagers = [...managers].sort(
     (first, second) => first.leagueRank - second.leagueRank,
   );
@@ -55,7 +57,7 @@ export function ManagerLeagueLeaderboard({
             <p className="truncate text-[10px] text-muted-foreground sm:text-xs">
               {view === "standings"
                 ? `Theo tổng điểm mùa · ${rankedManagers.length} manager · GW ${currentGameweek}`
-                : `Nhất và Bét tuần · ${gameweekRange}`}
+                : `Nhất & Bét tuần · ${gameweekRange}`}
             </p>
           </div>
         </div>
@@ -80,7 +82,7 @@ export function ManagerLeagueLeaderboard({
             onClick={() => setView("gameweek-stats")}
             className={`rounded-lg px-2.5 py-1.5 transition-colors ${view === "gameweek-stats" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
           >
-            Thống kê Gameweek
+            Nhất &amp; Bét GW
           </button>
         </div>
       </div>
@@ -113,11 +115,15 @@ export function ManagerLeagueLeaderboard({
             const isMe = myEntryId === manager.entry;
 
             return (
-              <div
+              <button
+                type="button"
                 key={manager.entry}
                 role="row"
                 aria-label={isMe ? `${manager.teamName}, manager của bạn` : undefined}
-                className={`grid min-h-[61px] grid-cols-[34px_minmax(0,1fr)_44px_56px] items-center gap-2 border-b px-3 py-2.5 last:border-b-0 sm:grid-cols-[42px_minmax(0,1fr)_64px_76px] sm:px-4 ${isMe ? "border-l-2 border-l-primary bg-primary/10 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.2)]" : getRowClass(manager.leagueRank, isLast)}`}
+                onClick={() => {
+                  setSelectedEntryId(manager.entry);
+                }}
+                className={`group grid min-h-[61px] w-full grid-cols-[34px_minmax(0,1fr)_44px_56px] items-center gap-2 border-b px-3 py-2.5 text-left transition-colors hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset last:border-b-0 sm:grid-cols-[42px_minmax(0,1fr)_64px_76px] sm:px-4 ${isMe ? "border-l-2 border-l-primary bg-primary/10 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.2)]" : getRowClass(manager.leagueRank, isLast)}`}
               >
               <span
                 className={`flex h-7 w-7 items-center justify-center rounded-lg font-mono text-[10px] font-black sm:h-8 sm:w-8 sm:text-xs ${getRankClass(manager.leagueRank, isLast)}`}
@@ -153,7 +159,14 @@ export function ManagerLeagueLeaderboard({
                       </span>
                     )}
                   </div>
-                  <p className="truncate text-[10px] text-muted-foreground sm:text-xs">{manager.manager}</p>
+                  <div className="flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground sm:text-xs">
+                    <p className="min-w-0 flex-1 truncate">{manager.manager}</p>
+                    <span className="inline-flex shrink-0 items-center gap-0.5 rounded-md px-1 py-0.5 text-[9px] font-bold text-primary transition-colors group-hover:bg-primary/10 group-hover:text-primary group-focus-visible:bg-primary/10">
+                      <span className="hidden sm:inline">Chi tiết</span>
+                      <ChevronRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                      <span className="sr-only">Xem chi tiết manager</span>
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -163,11 +176,17 @@ export function ManagerLeagueLeaderboard({
               <p className="text-right font-mono text-sm font-black tracking-tight text-emerald-700 dark:text-emerald-400 sm:text-base">
                 {manager.totalPoint.toLocaleString()}
               </p>
-              </div>
+              </button>
             );
           })}
         </div>
       )}
+      <ManagerWeeklyDetail
+        managers={managers}
+        stats={managerGameweekStats}
+        selectedEntryId={selectedEntryId}
+        onClose={() => setSelectedEntryId(null)}
+      />
     </section>
   );
 }

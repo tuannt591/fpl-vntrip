@@ -164,8 +164,17 @@ export type ManagerGameweekScore = {
   shared: boolean;
 };
 
+export type ManagerWeeklyHistory = {
+  gameweek: number;
+  points: number;
+  transferCost: number;
+  totalPoints: number;
+  leagueRank: number;
+};
+
 export type ManagerGameweekStat = {
   entry: number;
+  weeklyHistory: ManagerWeeklyHistory[];
   firstWeeks: ManagerGameweekScore[];
   lastWeeks: ManagerGameweekScore[];
   highestScore: number | null;

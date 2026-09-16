@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
-import { ChevronRight, Crown, Medal } from "lucide-react";
+import { ChevronLeft, ChevronRight, Crown, Medal } from "lucide-react";
 
 import {
   Dialog,
@@ -17,6 +17,7 @@ import type {
   ManagerGameweekScore,
   ManagerGameweekStat,
   ManagerGameweekStatsData,
+  ManagerWeeklyHistory,
 } from "@/types/fantasy";
 
 type ManagerGameweekStatsProps = {
@@ -153,6 +154,182 @@ function RecordValue({
   );
 }
 
+function ManagerWeeklyChart({ weeks }: { weeks: ManagerWeeklyHistory[] }) {
+  const visibleWeeks = weeks.slice(-8);
+  const values = visibleWeeks.map((week) => week.points);
+  const highest = Math.max(...values);
+  const lowest = Math.min(...values);
+  const chartCeiling = Math.ceil((highest + 4) / 10) * 10;
+  const chartFloor = Math.min(0, Math.floor((lowest - 4) / 10) * 10);
+  const chartRange = Math.max(chartCeiling - chartFloor, 10);
+  const chartWidth = 340;
+  const chartHeight = 164;
+  const plot = { left: 34, right: 14, top: 22, bottom: 34 };
+  const plotWidth = chartWidth - plot.left - plot.right;
+  const plotHeight = chartHeight - plot.top - plot.bottom;
+  const toY = (points: number) =>
+    plot.top + ((chartCeiling - points) / chartRange) * plotHeight;
+  const pointCoordinates = visibleWeeks.map((week, index) => {
+    const x = visibleWeeks.length === 1
+      ? plot.left + plotWidth / 2
+      : plot.left + (index / (visibleWeeks.length - 1)) * plotWidth;
+    const y = toY(week.points);
+    return { ...week, x, y };
+  });
+  const linePath = pointCoordinates.map((point) => `${point.x},${point.y}`).join(" ");
+  const areaPath = pointCoordinates.length
+    ? `M ${pointCoordinates[0].x} ${toY(chartFloor)} L ${linePath.replaceAll(",", " ")} L ${pointCoordinates[pointCoordinates.length - 1].x} ${toY(chartFloor)} Z`
+    : "";
+  const ticks = [chartCeiling, Math.round((chartCeiling + chartFloor) / 2), chartFloor];
+
+  if (visibleWeeks.length === 0) return null;
+
+  return (
+    <section aria-label="Biểu đồ điểm theo Gameweek">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-black">Diễn biến điểm</h3>
+          <p className="text-[10px] text-muted-foreground">{visibleWeeks.length} Gameweek gần nhất</p>
+        </div>
+        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+          {lowest}–{highest} điểm
+        </span>
+      </div>
+      <div className="overflow-hidden rounded-2xl border bg-gradient-to-b from-primary/[0.08] via-transparent to-muted/[0.15] px-1 py-1">
+        <svg
+          viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+          className="h-auto w-full"
+          role="img"
+          aria-label="Điểm của manager theo các Gameweek gần nhất"
+        >
+          <defs>
+            <linearGradient id="manager-weekly-chart-area" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.3" />
+              <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {ticks.map((tick) => {
+            const y = toY(tick);
+            return (
+              <g key={tick}>
+                <line x1={plot.left} x2={chartWidth - plot.right} y1={y} y2={y} className="stroke-border/70" strokeWidth="1" />
+                <text x={plot.left - 8} y={y + 4} textAnchor="end" className="fill-muted-foreground text-[10px] font-medium">
+                  {tick}
+                </text>
+              </g>
+            );
+          })}
+          <path d={areaPath} fill="url(#manager-weekly-chart-area)" />
+          <polyline
+            points={linePath}
+            fill="none"
+            className="stroke-primary"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          {pointCoordinates.map((point, index) => (
+            <g key={point.gameweek}>
+              <title>{`GW ${point.gameweek}: ${point.points} điểm`}</title>
+              <circle cx={point.x} cy={point.y} r="5" className="fill-background stroke-primary" strokeWidth="2.5" />
+              {(visibleWeeks.length <= 6 || index === pointCoordinates.length - 1 || index === 0) && (
+                <text x={point.x} y={Math.max(point.y - 10, 14)} textAnchor="middle" className="fill-foreground text-[10px] font-black">
+                  {point.points}
+                </text>
+              )}
+              <text x={point.x} y={chartHeight - 12} textAnchor="middle" className="fill-muted-foreground text-[10px] font-medium">
+                GW {point.gameweek}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+    </section>
+  );
+}
+
+function ManagerWeeklyHistoryTable({
+  weeks,
+  page,
+  totalPages,
+  onPageChange,
+}: {
+  weeks: ManagerWeeklyHistory[];
+  page: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}) {
+  const firstGameweek = weeks[0]?.gameweek;
+  const lastGameweek = weeks[weeks.length - 1]?.gameweek;
+  const rangeLabel = firstGameweek && lastGameweek
+    ? firstGameweek === lastGameweek
+      ? `GW ${firstGameweek}`
+      : `GW ${firstGameweek}–${lastGameweek}`
+    : "—";
+
+  return (
+    <section aria-label="Lịch sử điểm từng Gameweek">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-black">Lịch sử Gameweek</h3>
+          <p className="text-[10px] text-muted-foreground">Điểm đã trừ hit chuyển nhượng</p>
+        </div>
+        <div className="flex items-center gap-1 rounded-xl border bg-muted/30 p-0.5" aria-label="Chọn cụm Gameweek">
+          <button
+            type="button"
+            aria-label="Xem các Gameweek cũ hơn"
+            disabled={page >= totalPages - 1}
+            onClick={() => onPageChange(page + 1)}
+            className="inline-flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-background hover:text-foreground disabled:pointer-events-none disabled:opacity-35"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+          </button>
+          <span aria-live="polite" className="min-w-[60px] text-center font-mono text-[10px] font-black text-foreground">
+            {rangeLabel}
+          </span>
+          <button
+            type="button"
+            aria-label="Xem các Gameweek mới hơn"
+            disabled={page === 0}
+            onClick={() => onPageChange(page - 1)}
+            className="inline-flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-background hover:text-foreground disabled:pointer-events-none disabled:opacity-35"
+          >
+            <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+          </button>
+        </div>
+      </div>
+      <div className="overflow-hidden rounded-2xl border">
+        <div className="grid grid-cols-[42px_minmax(0,1fr)_44px] items-center gap-2 border-b bg-muted/35 px-3 py-2 text-[9px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+          <span>GW</span>
+          <span>Điểm</span>
+          <span className="text-right">Hạng</span>
+        </div>
+        <div>
+          {[...weeks].reverse().map((week) => (
+            <div
+              key={week.gameweek}
+              className="grid min-h-10 grid-cols-[42px_minmax(0,1fr)_44px] items-center gap-2 border-b px-3 py-2 last:border-b-0"
+            >
+              <span className="font-mono text-xs font-black">{week.gameweek}</span>
+              <span className="min-w-0 font-mono text-sm font-black text-foreground">
+                {week.points.toLocaleString()}
+                {week.transferCost > 0 && (
+                  <span className="ml-1.5 rounded bg-destructive/10 px-1 py-0.5 font-sans text-[9px] font-bold text-destructive">
+                    −{week.transferCost}
+                  </span>
+                )}
+              </span>
+              <span className="justify-self-end rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] font-black text-muted-foreground">
+                #{week.leagueRank}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function ManagerGameweekStats({
   managers,
   stats,
@@ -203,7 +380,7 @@ export function ManagerGameweekStats({
     <div role="table" aria-label="Thống kê Nhất tuần và Bét tuần của manager">
       <div
         role="row"
-        className="grid grid-cols-[30px_minmax(0,1fr)_62px_62px_18px] items-center gap-2 border-b bg-muted/20 px-3 py-2 text-[9px] font-bold uppercase tracking-[0.1em] text-muted-foreground sm:grid-cols-[42px_minmax(0,1fr)_100px_100px_24px] sm:px-4 sm:text-[10px]"
+        className="grid grid-cols-[30px_minmax(0,1fr)_62px_62px] items-center gap-2 border-b bg-muted/20 px-3 py-2 text-[9px] font-bold uppercase tracking-[0.1em] text-muted-foreground sm:grid-cols-[42px_minmax(0,1fr)_100px_100px] sm:px-4 sm:text-[10px]"
       >
         <span>Hạng</span>
         <span>Manager</span>
@@ -213,7 +390,6 @@ export function ManagerGameweekStats({
         <span role="columnheader" className="text-right whitespace-nowrap">
           Bét tuần <span className="block normal-case sm:inline">(lần)</span>
         </span>
-        <span aria-hidden />
       </div>
 
       {rankedManagers.map((manager, index) => {
@@ -232,7 +408,7 @@ export function ManagerGameweekStats({
               type="button"
               onClick={() => setSelectedEntryId(manager.entry)}
               className={cn(
-                "group grid min-h-[60px] w-full grid-cols-[30px_minmax(0,1fr)_62px_62px_18px] items-center gap-2 px-3 py-2.5 text-left transition-colors hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset sm:grid-cols-[42px_minmax(0,1fr)_100px_100px_24px] sm:px-4",
+                "group grid min-h-[60px] w-full grid-cols-[30px_minmax(0,1fr)_62px_62px] items-center gap-2 px-3 py-2.5 text-left transition-colors hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset sm:grid-cols-[42px_minmax(0,1fr)_100px_100px] sm:px-4",
                 isMe && "border-l-2 border-l-primary bg-primary/[0.07]",
                 isFirstWeekLeader && !isMe && "bg-amber-500/[0.035]",
                 isLastWeekLeader && !isFirstWeekLeader && !isMe && "bg-rose-500/[0.035]",
@@ -266,8 +442,13 @@ export function ManagerGameweekStats({
                       </span>
                     )}
                   </span>
-                  <span className="block truncate text-[10px] text-muted-foreground sm:text-xs">
-                    {manager.manager}
+                  <span className="flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground sm:text-xs">
+                    <span className="min-w-0 flex-1 truncate">{manager.manager}</span>
+                    <span className="inline-flex shrink-0 items-center gap-0.5 rounded-md px-1 py-0.5 text-[9px] font-bold text-primary transition-colors group-hover:bg-primary/10 group-hover:text-primary group-focus-visible:bg-primary/10">
+                      <span className="hidden sm:inline">Chi tiết</span>
+                      <ChevronRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" aria-hidden />
+                      <span className="sr-only">Xem chi tiết manager</span>
+                    </span>
                   </span>
                 </span>
               </span>
@@ -289,9 +470,6 @@ export function ManagerGameweekStats({
               >
                 {managerStats.lastWeeks.length}
               </span>
-              <span className="flex h-5 w-5 items-center justify-center rounded-md text-muted-foreground transition-colors group-hover:bg-background group-hover:text-foreground sm:h-6 sm:w-6">
-                <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
-              </span>
             </button>
           </div>
         );
@@ -309,7 +487,7 @@ export function ManagerGameweekStats({
               <Medal className="h-4 w-4" aria-hidden />
             </span>
             <div className="min-w-0">
-              <h2 className="text-sm font-black tracking-tight sm:text-base">Thống kê Gameweek</h2>
+              <h2 className="text-sm font-black tracking-tight sm:text-base">Nhất &amp; Bét Gameweek</h2>
               <p className="truncate text-[10px] text-muted-foreground sm:text-xs">
                 {rankedManagers.length} manager · {rangeLabel}
               </p>

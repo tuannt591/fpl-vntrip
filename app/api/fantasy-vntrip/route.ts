@@ -3,6 +3,7 @@ import {
   type ManagerGameweekScore,
   type ManagerGameweekStat,
   type ManagerGameweekStatsData,
+  type ManagerWeeklyHistory,
 } from '@/types/fantasy';
 import { FPL_API_BASE, TEAMS_CONFIG, WIN_LOSS_START_GW, EXCLUDED_ENTRIES, CACHE_DURATION, MANAGER_AVATARS } from '@/lib/fpl-config';
 import { getFplBootstrapStatic } from '@/lib/fpl-bootstrap';
@@ -106,8 +107,13 @@ let cachedManagerGameweekStats: {
   fetchedAt: number;
 } | null = null;
 
-function getNetGameweekPoints(history: any): Map<number, number> {
-  const pointsByGameweek = new Map<number, number>();
+type GameweekPoints = {
+  points: number;
+  transferCost: number;
+};
+
+function getNetGameweekPoints(history: any): Map<number, GameweekPoints> {
+  const pointsByGameweek = new Map<number, GameweekPoints>();
 
   for (const event of history?.current ?? []) {
     const gameweek = Number(event?.event);
@@ -119,7 +125,10 @@ function getNetGameweekPoints(history: any): Map<number, number> {
       Number.isFinite(points) &&
       Number.isFinite(transferCost)
     ) {
-      pointsByGameweek.set(gameweek, points - transferCost);
+      pointsByGameweek.set(gameweek, {
+        points: points - transferCost,
+        transferCost,
+      });
     }
   }
 
@@ -156,19 +165,23 @@ async function getManagerGameweekStats(
     histories.map(([entryId, history]) => [entryId, getNetGameweekPoints(history)]),
   );
   const scoresByManager = new Map<number, ManagerGameweekScore[]>();
+  const weeklyHistoryByManager = new Map<number, ManagerWeeklyHistory[]>();
   const firstWeeksByManager = new Map<number, ManagerGameweekScore[]>();
   const lastWeeksByManager = new Map<number, ManagerGameweekScore[]>();
+  const cumulativePointsByEntry = new Map<number, number>();
 
   entryIds.forEach((entryId) => {
     scoresByManager.set(entryId, []);
+    weeklyHistoryByManager.set(entryId, []);
     firstWeeksByManager.set(entryId, []);
     lastWeeksByManager.set(entryId, []);
+    cumulativePointsByEntry.set(entryId, 0);
   });
 
   for (let gameweek = 1; gameweek <= completedGameweek; gameweek += 1) {
     const weeklyScores = entryIds.flatMap((entryId) => {
-      const points = scoresByEntry.get(entryId)?.get(gameweek);
-      return points === undefined ? [] : [{ entryId, points }];
+      const score = scoresByEntry.get(entryId)?.get(gameweek);
+      return score === undefined ? [] : [{ entryId, ...score }];
     });
 
     if (weeklyScores.length === 0) continue;
@@ -179,6 +192,30 @@ async function getManagerGameweekStats(
     const bottomCount = weeklyScores.filter((item) => item.points === lowestPoints).length;
 
     weeklyScores.forEach(({ entryId, points }) => {
+      cumulativePointsByEntry.set(
+        entryId,
+        (cumulativePointsByEntry.get(entryId) ?? 0) + points,
+      );
+    });
+
+    const leagueRankByEntry = new Map<number, number>();
+    let previousPoints: number | null = null;
+    let currentRank = 0;
+    [...entryIds]
+      .sort((first, second) => {
+        const pointDifference =
+          (cumulativePointsByEntry.get(second) ?? 0) -
+          (cumulativePointsByEntry.get(first) ?? 0);
+        return pointDifference || first - second;
+      })
+      .forEach((entryId, index) => {
+        const totalPoints = cumulativePointsByEntry.get(entryId) ?? 0;
+        if (totalPoints !== previousPoints) currentRank = index + 1;
+        leagueRankByEntry.set(entryId, currentRank);
+        previousPoints = totalPoints;
+      });
+
+    weeklyScores.forEach(({ entryId, points, transferCost }) => {
       const score: ManagerGameweekScore = {
         gameweek,
         points,
@@ -187,6 +224,13 @@ async function getManagerGameweekStats(
           (points === lowestPoints && bottomCount > 1),
       };
       scoresByManager.get(entryId)?.push(score);
+      weeklyHistoryByManager.get(entryId)?.push({
+        gameweek,
+        points,
+        transferCost,
+        totalPoints: cumulativePointsByEntry.get(entryId) ?? points,
+        leagueRank: leagueRankByEntry.get(entryId) ?? entryIds.length,
+      });
 
       // A full-league tie should not count as both Nhất tuần and Bét tuần.
       if (highestPoints === lowestPoints) return;
@@ -207,6 +251,7 @@ async function getManagerGameweekStats(
 
     return {
       entry: entryId,
+      weeklyHistory: weeklyHistoryByManager.get(entryId) ?? [],
       firstWeeks: firstWeeksByManager.get(entryId) ?? [],
       lastWeeks: lastWeeksByManager.get(entryId) ?? [],
       highestScore,

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from "next/image";
-import { ChevronDown, ChevronRight, RefreshCw, Search, Trophy } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, RefreshCw, Search, Trophy } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ManagerAccordionList } from './ui/manager-accordion-list';
@@ -363,13 +363,21 @@ export const FantasyLeaderboard = () => {
   const [teamFilter, setTeamFilter] = useState<TeamFilter>("all");
   const [managerQuery, setManagerQuery] = useState("");
   const [hasLoadedData, setHasLoadedData] = useState(() => Boolean(initialData));
+  const [refreshResult, setRefreshResult] = useState<"idle" | "updated">("idle");
   const forceReloadRef = useRef(false);
+  const refreshResultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const reloadData = () => {
+    if (refreshResultTimerRef.current) clearTimeout(refreshResultTimerRef.current);
+    setRefreshResult("idle");
     forceReloadRef.current = true;
     setReloadKey(prev => prev + 1);
     setSelectedGW(0);
   };
+
+  useEffect(() => () => {
+    if (refreshResultTimerRef.current) clearTimeout(refreshResultTimerRef.current);
+  }, []);
 
   const selectHomeTab = (tab: HomeTab) => {
     setActiveTab(tab);
@@ -414,6 +422,12 @@ export const FantasyLeaderboard = () => {
         );
         if (cancelled) return;
         applyResult(result);
+        if (forceReload) {
+          setRefreshResult("updated");
+          refreshResultTimerRef.current = setTimeout(() => {
+            setRefreshResult("idle");
+          }, 2500);
+        }
       } catch (err) {
         if (cancelled) return;
 
@@ -516,6 +530,11 @@ export const FantasyLeaderboard = () => {
     setSelectedScenarioTeam(null);
     setShowAllScenarioPlayers(false);
   };
+  const refreshLabel = isLoading
+    ? "Đang cập nhật"
+    : refreshResult === "updated"
+      ? "Đã cập nhật"
+      : null;
 
   if (isLoading && !hasLoadedData) {
     return <FantasyLeaderboardLoadingSkeleton />;
@@ -581,13 +600,20 @@ export const FantasyLeaderboard = () => {
               )}
               <button
                 onClick={reloadData}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border bg-background text-muted-foreground shadow-sm transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border bg-background shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50 ${refreshLabel
+                  ? "border-primary/40 bg-primary/5 text-primary"
+                  : "text-muted-foreground"
+                  }`}
                 disabled={isLoading}
-                aria-label="Làm mới bảng xếp hạng"
-                title="Làm mới"
+                aria-label={refreshLabel ?? "Làm mới bảng xếp hạng"}
+                title={refreshLabel ?? "Làm mới"}
                 type="button"
               >
-                <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+                {refreshResult === "updated" && !isLoading ? (
+                  <Check className="h-4 w-4" aria-hidden />
+                ) : (
+                  <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} aria-hidden />
+                )}
               </button>
             </div>
           </div>
@@ -626,6 +652,23 @@ export const FantasyLeaderboard = () => {
               </button>
             ))}
           </div>
+          {((isLoading && hasLoadedData) || refreshResult === "updated") && (
+            <div
+              role="status"
+              aria-live="polite"
+              className={`pointer-events-none fixed bottom-5 left-1/2 z-50 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center justify-center gap-2 whitespace-nowrap rounded-xl border px-3 py-2 text-xs font-semibold shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200 ${isLoading
+                ? "border-primary/15 bg-background/95 text-primary backdrop-blur"
+                : "border-emerald-500/20 bg-background/95 text-emerald-700 backdrop-blur dark:text-emerald-400"
+                }`}
+            >
+              {isLoading ? (
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" aria-hidden />
+              ) : (
+                <Check className="h-3.5 w-3.5" aria-hidden />
+              )}
+              {isLoading ? "Đang cập nhật dữ liệu mới…" : "Đã cập nhật dữ liệu mới"}
+            </div>
+          )}
           {isLoading && !hasLoadedData ? (
             <FantasyLeaderboardContentSkeleton activeTab={activeTab} />
           ) : (
