@@ -5,6 +5,7 @@ import {
   type ManagerGameweekStatsData,
 } from '@/types/fantasy';
 import { FPL_API_BASE, TEAMS_CONFIG, WIN_LOSS_START_GW, EXCLUDED_ENTRIES, CACHE_DURATION, MANAGER_AVATARS } from '@/lib/fpl-config';
+import { getFplBootstrapStatic } from '@/lib/fpl-bootstrap';
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -232,51 +233,21 @@ async function getManagerGameweekStats(
 }
 
 
-let cachedBootstrapData: any = null;
-let lastFetchTime: number = 0;
-
 async function getBootstrapData(): Promise<any> {
-  const now = Date.now();
-
-  if (cachedBootstrapData && now - lastFetchTime < CACHE_DURATION) {
-    console.log('[API] bootstrap-static -> RAM Cache Hit ✅');
-    return cachedBootstrapData;
-  }
-
   try {
-    const response = await fetch(
-      `${FPL_API_BASE}/bootstrap-static/`,
-      {
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
-        next: { revalidate: 60 },
-      },
-    );
-
-    console.log(`[API] bootstrap-static -> status: ${response.status} (New Fetch)`);
-
-    if (response.ok) {
-      const data = await response.json();
-      const currentEvent = data.events.find((event: any) => event.is_current);
-      const finalResult = {
-        currentEvent: currentEvent ? currentEvent.id : 1,
-        elements: data.elements,
-        teams: data.teams,
-        events: data.events,
-      };
-
-      cachedBootstrapData = finalResult;
-      lastFetchTime = now;
-
-      return finalResult;
-    }
+    const data = await getFplBootstrapStatic();
+    const currentEvent = data.events.find((event: any) => event.is_current);
+    return {
+      currentEvent: currentEvent ? currentEvent.id : 1,
+      elements: data.elements,
+      teams: data.teams,
+      events: data.events,
+    };
   } catch (error) {
     console.error('[API] Error fetching bootstrap-static:', error);
   }
 
-  return cachedBootstrapData || { currentEvent: 1, elements: [], teams: [], events: [] }; // fallback
+  return { currentEvent: 1, elements: [], teams: [], events: [] }; // fallback
 }
 
 async function getElementLiveByEventId(eventId: number): Promise<any> {

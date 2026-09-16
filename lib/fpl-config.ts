@@ -9,7 +9,7 @@ export const TEAMS_CONFIG: { [key: string]: number[] } = {
 
 // Manager avatar mapping (entryId -> image filename in /public)
 export const MANAGER_AVATARS: Record<number, string> = {
-  2673641: '/tho.jpg',
+  2673641: '/thomanh.jpg',
   2799618: '/chuchinh.jpg',
   2673983: '/tanzon.jpg',
   3620408: '/tuanmet.jpg',

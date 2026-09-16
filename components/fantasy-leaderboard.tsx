@@ -626,7 +626,7 @@ export const FantasyLeaderboard = () => {
               </button>
             ))}
           </div>
-          {isLoading ? (
+          {isLoading && !hasLoadedData ? (
             <FantasyLeaderboardContentSkeleton activeTab={activeTab} />
           ) : (
             <>

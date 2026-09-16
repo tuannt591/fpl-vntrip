@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { FPL_API_BASE } from '@/lib/fpl-config';
+import { getFplBootstrapStatic } from '@/lib/fpl-bootstrap';
 
 export type FplGameweek = {
   id: number;
@@ -35,16 +36,9 @@ function fplHeaders() {
 }
 
 export async function getFplGameweeks(): Promise<FplGameweek[]> {
-  const response = await fetch(`${FPL_API_BASE}/bootstrap-static/`, {
-    headers: fplHeaders(),
-    next: { revalidate: 60 },
-  });
-
-  if (!response.ok) {
-    throw new Error(`FPL bootstrap request failed with status ${response.status}.`);
-  }
-
-  const body = (await response.json()) as { events?: BootstrapEvent[] };
+  const body = (await getFplBootstrapStatic()) as {
+    events?: BootstrapEvent[];
+  };
   return (body.events ?? [])
     .map((event): FplGameweek | null => {
       const id = Number(event.id);
